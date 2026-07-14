@@ -1,5 +1,7 @@
 pluginManagement {
 	repositories {
+		maven { url = "https://mirrors.tencent.com/nexus/repository/maven-public/" }
+		maven { url = "https://mirrors.tencent.com/nexus/repository/gradle-plugin/" }
 		maven { url = "https://maven.fabricmc.net/" }
 		maven { url = "https://maven.minecraftforge.net/" }
 		mavenCentral()

@@ -51,6 +51,8 @@ public class RenderRails implements IGui {
 	private static final Identifier ONE_WAY_RAIL_ARROW_TEXTURE = new Identifier(Init.MOD_ID, "textures/block/one_way_rail_arrow.png");
 	private static final int INVALID_NODE_CHECK_RADIUS = 16;
 	private static final double LIGHT_REFERENCE_OFFSET = 0.1;
+	private static final net.minecraft.util.math.BlockPos.Mutable REUSABLE_RAW = new net.minecraft.util.math.BlockPos.Mutable();
+	private static final BlockPos REUSABLE_BLOCK_POS = new BlockPos(REUSABLE_RAW);
 	private static final ModelSmallCube MODEL_SMALL_CUBE = new ModelSmallCube(new Identifier(Init.MOD_ID, "textures/block/white.png"));
 
 	public static void render() {
@@ -318,21 +320,41 @@ public class RenderRails implements IGui {
 		final Camera camera = MinecraftClient.getInstance().getGameRendererMapped().getCamera();
 		final Vector3d cameraPosition = camera.getPos();
 		final int renderDistance = MinecraftClientHelper.getRenderDistance() * 16;
+		final double renderDistanceSquared = (double) renderDistance * renderDistance;
+		final double cameraX = cameraPosition.getXMapped();
+		final double cameraZ = cameraPosition.getZMapped();
 
-		rail.railMath.render((x1, z1, x2, z2, x3, z3, x4, z4, y1, y2) -> {
-			final BlockPos blockPos = Init.newBlockPos(x1, y1 + LIGHT_REFERENCE_OFFSET, z1);
-			final double distanceToCamera = new Vector3d(x1, 0, z1).distanceTo(new Vector3d(cameraPosition.getXMapped(), 0, cameraPosition.getZMapped())); // Minecraft does not have vertical render distance, no need to compare the Y-axis.
-			if (distanceToCamera <= renderDistance) {
-				if (distanceToCamera < 32) {
-					callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
+		final float yawRad = (float) Math.toRadians(camera.getYaw());
+		final float pitchRad = (float) Math.toRadians(camera.getPitch());
+		final double sinYaw = Math.sin(yawRad);
+		final double cosYaw = Math.cos(yawRad);
+		final double sinPitch = Math.sin(pitchRad);
+		final double cosPitch = Math.cos(pitchRad);
+		final double cameraY = cameraPosition.getYMapped();
+		final double rd = renderDistance;
+
+		final org.mtr.core.data.RailMath.RenderRail renderRailCallback = (x1, z1, x2, z2, x3, z3, x4, z4, y1, y2) -> {
+			REUSABLE_RAW.set((int) Math.floor(x1), (int) Math.floor(y1 + LIGHT_REFERENCE_OFFSET), (int) Math.floor(z1));
+			final double dx = x1 - cameraX;
+			final double dz = z1 - cameraZ;
+			final double distSq = dx * dx + dz * dz;
+			if (distSq <= rd * rd) {
+				if (distSq < 1024) {
+					callback.renderRail(REUSABLE_BLOCK_POS, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 				} else {
-					final Vector3d rotatedVector = new Vector3d(x1, y1, z1).subtract(cameraPosition).rotateY((float) Math.toRadians(camera.getYaw())).rotateX((float) Math.toRadians(camera.getPitch()));
-					if (rotatedVector.getZMapped() > 0) {
-						callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
+					final double rx = x1 - cameraX;
+					final double ry = y1 - cameraY;
+					final double rz = z1 - cameraZ;
+					final double r1x = rx * cosYaw + rz * sinYaw;
+					final double r1z = rz * cosYaw - rx * sinYaw;
+					if (ry * sinPitch + r1z * cosPitch > 0) {
+						callback.renderRail(REUSABLE_BLOCK_POS, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 					}
 				}
 			}
-		}, interval, offsetRadius1, offsetRadius2);
+		};
+
+		rail.railMath.render(renderRailCallback, interval, offsetRadius1, offsetRadius2, cameraX, cameraZ, renderDistanceSquared);
 	}
 
 	private static void renderNode(BlockState blockState, BlockPos blockPos, BooleanSupplier shouldRender, int light) {
