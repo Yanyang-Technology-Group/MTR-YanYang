@@ -318,16 +318,28 @@ public class RenderRails implements IGui {
 		final Camera camera = MinecraftClient.getInstance().getGameRendererMapped().getCamera();
 		final Vector3d cameraPosition = camera.getPos();
 		final int renderDistance = MinecraftClientHelper.getRenderDistance() * 16;
+		final double cameraX = cameraPosition.getXMapped();
+		final double cameraY = cameraPosition.getYMapped();
+		final double cameraZ = cameraPosition.getZMapped();
+		final float yaw = (float) Math.toRadians(camera.getYaw());
+		final float pitch = (float) Math.toRadians(camera.getPitch());
+		final float yawCos = MathHelper.cos(yaw);
+		final float yawSin = MathHelper.sin(yaw);
+		final float pitchCos = MathHelper.cos(pitch);
+		final float pitchSin = MathHelper.sin(pitch);
 
 		rail.railMath.render((x1, z1, x2, z2, x3, z3, x4, z4, y1, y2) -> {
 			final BlockPos blockPos = Init.newBlockPos(x1, y1 + LIGHT_REFERENCE_OFFSET, z1);
-			final double distanceToCamera = new Vector3d(x1, 0, z1).distanceTo(new Vector3d(cameraPosition.getXMapped(), 0, cameraPosition.getZMapped())); // Minecraft does not have vertical render distance, no need to compare the Y-axis.
+			final double deltaX = x1 - cameraX;
+			final double deltaZ = z1 - cameraZ;
+			final double distanceToCamera = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ); // Minecraft does not have vertical render distance, no need to compare the Y-axis.
 			if (distanceToCamera <= renderDistance) {
 				if (distanceToCamera < 32) {
 					callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 				} else {
-					final Vector3d rotatedVector = new Vector3d(x1, y1, z1).subtract(cameraPosition).rotateY((float) Math.toRadians(camera.getYaw())).rotateX((float) Math.toRadians(camera.getPitch()));
-					if (rotatedVector.getZMapped() > 0) {
+					// Equivalent to Vec3d.subtract(camera).rotateY(yaw).rotateX(pitch), without allocating four vectors per segment.
+					final double rotatedZ = (deltaZ * yawCos - deltaX * yawSin) * pitchCos - (y1 - cameraY) * pitchSin;
+					if (rotatedZ > 0) {
 						callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 					}
 				}
