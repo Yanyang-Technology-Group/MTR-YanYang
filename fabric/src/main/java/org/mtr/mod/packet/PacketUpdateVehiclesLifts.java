@@ -1,6 +1,7 @@
 package org.mtr.mod.packet;
 
 import org.mtr.core.data.NameColorDataBase;
+import org.mtr.core.data.ClientData;
 import org.mtr.core.data.PathData;
 import org.mtr.core.operation.VehicleLiftResponse;
 import org.mtr.core.serializer.JsonReader;
@@ -10,7 +11,7 @@ import org.mtr.core.serializer.WriterBase;
 import org.mtr.core.servlet.OperationProcessor;
 import org.mtr.core.tool.Utilities;
 import org.mtr.libraries.it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import org.mtr.libraries.it.unimi.dsi.fastutil.longs.LongAVLTreeSet;
+import org.mtr.libraries.it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import org.mtr.mapping.mapper.EntityHelper;
@@ -43,7 +44,11 @@ public final class PacketUpdateVehiclesLifts extends PacketRequestResponseBase {
 	protected void runClientInbound(JsonReader jsonReader) {
 		final MinecraftClientData minecraftClientData = MinecraftClientData.getInstance();
 		final VehicleLiftResponse vehicleLiftResponse = new VehicleLiftResponse(jsonReader, minecraftClientData);
-		final boolean hasUpdate1 = updateVehiclesOrLifts(minecraftClientData.vehicles, vehicleLiftResponse::iterateVehiclesToKeep, vehicleLiftResponse::iterateVehiclesToUpdate, VehicleExtension::dispose, vehicleUpdate -> vehicleUpdate.getVehicle().getId(), vehicleUpdate -> new VehicleExtension(vehicleUpdate, minecraftClientData));
+		final boolean hasUpdate1 = updateVehiclesOrLifts(minecraftClientData.vehicles, vehicleLiftResponse::iterateVehiclesToKeep, vehicleLiftResponse::iterateVehiclesToUpdate, VehicleExtension::dispose, vehicleUpdate -> vehicleUpdate.getVehicle().getId(), vehicleUpdate -> {
+			final VehicleExtension vehicle = new VehicleExtension(vehicleUpdate, minecraftClientData);
+			PathData.writePathCache(vehicle.vehicleExtraData.immutablePath, new ClientData(), vehicle.getTransportMode());
+			return vehicle;
+		});
 		final boolean hasUpdate2 = updateVehiclesOrLifts(minecraftClientData.lifts, vehicleLiftResponse::iterateLiftsToKeep, vehicleLiftResponse::iterateLiftsToUpdate, (removedLift) -> {
 		}, NameColorDataBase::getId, lift -> lift);
 
@@ -56,12 +61,11 @@ public final class PacketUpdateVehiclesLifts extends PacketRequestResponseBase {
 			if (hasUpdate1) {
 				EntityHelper.HIDDEN_PLAYERS.clear();
 				minecraftClientData.vehicles.forEach(vehicle -> {
-					PathData.writePathCache(vehicle.vehicleExtraData.immutablePath, new MinecraftClientData(), vehicle.getTransportMode());
 					vehicle.vehicleExtraData.iterateRidingEntities(vehicleRidingEntity -> EntityHelper.HIDDEN_PLAYERS.add(vehicleRidingEntity.uuid));
 				});
-				RenderVehicles.RIDING_PLAYER_INTERPOLATIONS.removeIf(ridingPlayerInterpolation -> EntityHelper.HIDDEN_PLAYERS.stream().noneMatch(uuid -> uuid.equals(ridingPlayerInterpolation.uuid)));
+				RenderVehicles.RIDING_PLAYER_INTERPOLATIONS.removeIf(ridingPlayerInterpolation -> !EntityHelper.HIDDEN_PLAYERS.contains(ridingPlayerInterpolation.uuid));
 			}
-			minecraftClientData.sync();
+			minecraftClientData.syncDynamic();
 		}
 	}
 
@@ -94,11 +98,11 @@ public final class PacketUpdateVehiclesLifts extends PacketRequestResponseBase {
 		return PacketRequestResponseBase.ResponseType.NONE;
 	}
 
-	private static <T extends NameColorDataBase, U> boolean updateVehiclesOrLifts(ObjectArraySet<T> dataSet, Consumer<LongConsumer> iterateKeep, Consumer<Consumer<U>> iterateUpdate, Consumer<T> onRemove, ToLongFunction<U> getId, Function<U, T> createInstance) {
-		final LongAVLTreeSet keepIds = new LongAVLTreeSet();
+	static <T extends NameColorDataBase, U> boolean updateVehiclesOrLifts(ObjectArraySet<T> dataSet, Consumer<LongConsumer> iterateKeep, Consumer<Consumer<U>> iterateUpdate, Consumer<T> onRemove, ToLongFunction<U> getId, Function<U, T> createInstance) {
+		final LongOpenHashSet keepIds = new LongOpenHashSet();
 		iterateKeep.accept(keepIds::add);
 
-		final LongAVLTreeSet updateIds = new LongAVLTreeSet();
+		final LongOpenHashSet updateIds = new LongOpenHashSet();
 		final ObjectArrayList<U> dataSetToUpdate = new ObjectArrayList<>();
 		iterateUpdate.accept(dataToUpdate -> {
 			dataSetToUpdate.add(dataToUpdate);

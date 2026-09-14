@@ -23,7 +23,6 @@ import org.mtr.mod.client.MinecraftClientData;
 import org.mtr.mod.client.VehicleRidingMovement;
 import org.mtr.mod.data.IGui;
 import org.mtr.mod.item.ItemLiftRefresher;
-import org.mtr.mod.model.ModelLift1;
 import org.mtr.mod.model.ModelSmallCube;
 import org.mtr.mod.resource.LiftResource;
 
@@ -161,7 +160,7 @@ public class RenderLifts implements IGui {
 
 				// Render the lift
 				final StoredMatrixTransformations storedMatrixTransformations = RenderVehicles.getStoredMatrixTransformations(offsetVector == null, renderingPositionAndRotation, 0);
-				new ModelLift1((int) Math.round(lift.getHeight() * 2), (int) Math.round(lift.getWidth()), (int) Math.round(lift.getDepth()), lift.getIsDoubleSided()).render(
+				liftWrapper.getModel().render(
 						storedMatrixTransformations,
 						null,
 						getLiftResource(lift.getStyle()).getTexture(),

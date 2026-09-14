@@ -2,7 +2,7 @@
 	"schemaVersion": 1,
 	"id": "mtr",
 	"version": "@version@",
-	"name": "Minecraft Transit Railway",
+	"name": "MTR-Yanyang",
 	"description": "A Minecraft mod that adds automated train systems into the game.",
 	"authors": [
 		"Jonathan Ho"
@@ -30,7 +30,8 @@
 		]
 	},
 	"mixins": [
-		"mtr.mixins.json"
+		"mtr.mixins.json",
+		"mtr.performance.mixins.json"
 	],
 	"depends": {
 		"fabric": "*",

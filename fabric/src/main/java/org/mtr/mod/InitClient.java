@@ -66,6 +66,7 @@ public final class InitClient {
 
 	public static void init() {
 		KeyBindings.init();
+		BlockEntityRenderCulling.init();
 		Init.writeFromClient();
 
 		REGISTRY_CLIENT.registerBlockRenderType(RenderLayer.getCutout(), Blocks.APG_DOOR);
@@ -495,12 +496,15 @@ public final class InitClient {
 	}
 
 	public static Station findStation(BlockPos blockPos) {
-		return MinecraftClientData.getInstance().stations.stream().filter(station -> station.inArea(Init.blockPosToPosition(blockPos))).findFirst().orElse(null);
+		return MinecraftClientData.getInstance().spatialIndex.findStation(Init.blockPosToPosition(blockPos));
 	}
 
 	public static void findClosePlatform(BlockPos blockPos, int radius, Consumer<Platform> consumer) {
 		final Position position = Init.blockPosToPosition(blockPos);
-		MinecraftClientData.getInstance().platforms.stream().filter(platform -> platform.closeTo(Init.blockPosToPosition(blockPos), radius)).min(Comparator.comparingDouble(platform -> platform.getApproximateClosestDistance(position, MinecraftClientData.getInstance()))).ifPresent(consumer);
+		final Platform platform = MinecraftClientData.getInstance().spatialIndex.findClosePlatform(position, radius);
+		if (platform != null) {
+			consumer.accept(platform);
+		}
 	}
 
 	@Nullable

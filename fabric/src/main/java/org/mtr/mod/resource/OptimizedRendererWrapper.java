@@ -8,6 +8,16 @@ import javax.annotation.Nullable;
 
 public final class OptimizedRendererWrapper implements IGui {
 
+	private static long shaderGeneration;
+
+	public static long getShaderGeneration() {
+		return shaderGeneration;
+	}
+
+	public void invalidateShaders() {
+		shaderGeneration++;
+	}
+
 	@Nullable
 	private final OptimizedRenderer optimizedRenderer;
 

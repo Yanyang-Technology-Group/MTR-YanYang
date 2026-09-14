@@ -319,16 +319,17 @@ public class RenderRails implements IGui {
 		final Vector3d cameraPosition = camera.getPos();
 		final int renderDistance = MinecraftClientHelper.getRenderDistance() * 16;
 
-		rail.railMath.render((x1, z1, x2, z2, x3, z3, x4, z4, y1, y2) -> {
-			final BlockPos blockPos = Init.newBlockPos(x1, y1 + LIGHT_REFERENCE_OFFSET, z1);
-			final double distanceToCamera = new Vector3d(x1, 0, z1).distanceTo(new Vector3d(cameraPosition.getXMapped(), 0, cameraPosition.getZMapped())); // Minecraft does not have vertical render distance, no need to compare the Y-axis.
-			if (distanceToCamera <= renderDistance) {
-				if (distanceToCamera < 32) {
-					callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
+		MinecraftClientData.getInstance().railGeometryCache.render(rail.railMath, (x1, z1, x2, z2, x3, z3, x4, z4, y1, y2) -> {
+			final double dx = x1 - cameraPosition.getXMapped();
+			final double dz = z1 - cameraPosition.getZMapped();
+			final double distanceSquared = dx * dx + dz * dz;
+			if (distanceSquared <= (double) renderDistance * renderDistance) {
+				if (distanceSquared < 32 * 32) {
+					callback.renderRail(Init.newBlockPos(x1, y1 + LIGHT_REFERENCE_OFFSET, z1), x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 				} else {
 					final Vector3d rotatedVector = new Vector3d(x1, y1, z1).subtract(cameraPosition).rotateY((float) Math.toRadians(camera.getYaw())).rotateX((float) Math.toRadians(camera.getPitch()));
 					if (rotatedVector.getZMapped() > 0) {
-						callback.renderRail(blockPos, x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
+						callback.renderRail(Init.newBlockPos(x1, y1 + LIGHT_REFERENCE_OFFSET, z1), x1, z1, x2, z2, x3, z3, x4, z4, y1, y2);
 					}
 				}
 			}

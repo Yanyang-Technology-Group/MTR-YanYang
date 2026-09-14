@@ -14,6 +14,7 @@ import org.mtr.mod.Init;
 import org.mtr.mod.block.BlockNode;
 import org.mtr.mod.data.PersistentVehicleData;
 import org.mtr.mod.data.VehicleExtension;
+import org.mtr.mod.model.ModelLift1;
 import org.mtr.mod.screen.DashboardListItem;
 
 import javax.annotation.Nullable;
@@ -27,13 +28,15 @@ public final class MinecraftClientData extends ClientData {
 	public final ObjectArraySet<VehicleExtension> vehicles = new ObjectArraySet<>();
 	public final Long2ObjectAVLTreeMap<PersistentVehicleData> vehicleIdToPersistentVehicleData = new Long2ObjectAVLTreeMap<>();
 	public final Long2ObjectAVLTreeMap<LiftWrapper> liftWrapperList = new Long2ObjectAVLTreeMap<>();
-	public final Object2ObjectArrayMap<String, RailWrapper> railWrapperList = new Object2ObjectArrayMap<>();
+	public final Object2ObjectOpenHashMap<String, RailWrapper> railWrapperList = new Object2ObjectOpenHashMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToPreBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToCurrentlyBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final ObjectArraySet<String> blockedRailIds = new ObjectArraySet<>();
 	public final ObjectArrayList<DashboardListItem> railActions = new ObjectArrayList<>();
 
 	private final LongAVLTreeSet routeIdsWithDisabledAnnouncements = new LongAVLTreeSet();
+	public final ClientSpatialIndex spatialIndex = new ClientSpatialIndex(this);
+	public final RailGeometryCache railGeometryCache = new RailGeometryCache();
 
 	private static MinecraftClientData instance = new MinecraftClientData();
 	private static MinecraftClientData dashboardInstance = new MinecraftClientData();
@@ -52,10 +55,31 @@ public final class MinecraftClientData extends ClientData {
 	@Override
 	public void sync() {
 		super.sync();
+		syncDynamic();
+
+		checkAndRemoveFromMap(railWrapperList, rails, Rail::getHexId);
+		rails.forEach(rail -> {
+			final String hexId = rail.getHexId();
+			final RailWrapper railWrapper = railWrapperList.get(hexId);
+			if (railWrapper == null || railWrapper.rail != rail) {
+				railWrapperList.put(hexId, new RailWrapper(rail, hexId));
+			}
+		});
+
+		simplifiedRouteIdMap.clear();
+		simplifiedRoutes.forEach(simplifiedRoute -> simplifiedRouteIdMap.put(simplifiedRoute.getId(), simplifiedRoute));
+		spatialIndex.rebuild();
+		railGeometryCache.retainRails(rails);
+	}
+
+	// Vehicle snapshots do not change stations, routes, or rail adjacency.
+	public void syncDynamic() {
 		checkAndRemoveFromMap(vehicleIdToPersistentVehicleData, vehicles, NameColorDataBase::getId);
 
 		checkAndRemoveFromMap(liftWrapperList, lifts, Lift::getId);
+		liftIdMap.clear();
 		lifts.forEach(lift -> {
+			liftIdMap.put(lift.getId(), lift);
 			final LiftWrapper liftWrapper = liftWrapperList.get(lift.getId());
 			if (liftWrapper == null) {
 				liftWrapperList.put(lift.getId(), new LiftWrapper(lift));
@@ -63,19 +87,6 @@ public final class MinecraftClientData extends ClientData {
 				liftWrapper.lift = lift;
 			}
 		});
-
-		checkAndRemoveFromMap(railWrapperList, rails, Rail::getHexId);
-		positionsToRail.forEach((startPosition, railMap) -> railMap.forEach((endPosition, rail) -> {
-			final String hexId = rail.getHexId();
-			final RailWrapper railWrapper = railWrapperList.get(hexId);
-			if (railWrapper == null) {
-				railWrapperList.put(hexId, new RailWrapper(rail, hexId));
-			} else {
-				railWrapper.rail = rail;
-			}
-		}));
-
-		simplifiedRoutes.forEach(simplifiedRoute -> simplifiedRouteIdMap.put(simplifiedRoute.getId(), simplifiedRoute));
 	}
 
 	@Nullable
@@ -203,20 +214,20 @@ public final class MinecraftClientData extends ClientData {
 	}
 
 	private static <T, U, V> void checkAndRemoveFromMap(Map<T, U> map, ObjectSet<V> dataSet, Function<V, T> getId) {
-		final ObjectAVLTreeSet<T> idSet = dataSet.stream().map(getId).collect(Collectors.toCollection(ObjectAVLTreeSet::new));
-		final ObjectArrayList<T> idsToRemove = new ObjectArrayList<>();
-		map.keySet().forEach(id -> {
-			if (!idSet.contains(id)) {
-				idsToRemove.add(id);
-			}
-		});
-		idsToRemove.forEach(map::remove);
+		final ObjectOpenHashSet<T> idSet = new ObjectOpenHashSet<>();
+		dataSet.forEach(data -> idSet.add(getId.apply(data)));
+		map.keySet().removeIf(id -> !idSet.contains(id));
 	}
 
 	public static class LiftWrapper {
 
 		public boolean shouldRender;
 		private Lift lift;
+		private ModelLift1 model;
+		private int modelHeight;
+		private int modelWidth;
+		private int modelDepth;
+		private boolean modelDoubleSided;
 
 		private LiftWrapper(Lift lift) {
 			this.lift = lift;
@@ -224,6 +235,21 @@ public final class MinecraftClientData extends ClientData {
 
 		public Lift getLift() {
 			return lift;
+		}
+
+		public ModelLift1 getModel() {
+			final int height = (int) Math.round(lift.getHeight() * 2);
+			final int width = (int) Math.round(lift.getWidth());
+			final int depth = (int) Math.round(lift.getDepth());
+			final boolean doubleSided = lift.getIsDoubleSided();
+			if (model == null || height != modelHeight || width != modelWidth || depth != modelDepth || doubleSided != modelDoubleSided) {
+				model = new ModelLift1(height, width, depth, doubleSided);
+				modelHeight = height;
+				modelWidth = width;
+				modelDepth = depth;
+				modelDoubleSided = doubleSided;
+			}
+			return model;
 		}
 	}
 
@@ -233,7 +259,7 @@ public final class MinecraftClientData extends ClientData {
 		public final String hexId;
 		public final Vec3d startVector;
 		public final Vec3d endVector;
-		private Rail rail;
+		private final Rail rail;
 
 		private RailWrapper(Rail rail, String hexId) {
 			this.rail = rail;

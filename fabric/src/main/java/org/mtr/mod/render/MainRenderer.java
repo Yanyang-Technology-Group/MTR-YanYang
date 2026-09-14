@@ -1,7 +1,7 @@
 package org.mtr.mod.render;
 
 import org.mtr.core.data.InterchangeColorsForStationName;
-import org.mtr.libraries.it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
+import org.mtr.libraries.it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.mapping.holder.*;
 import org.mtr.mapping.mapper.EntityRenderer;
@@ -34,18 +34,21 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 
 	private static final int FLASHING_INTERVAL = 1000;
 	private static final int TOTAL_RENDER_STAGES = 2;
-	private static final ObjectArrayList<ObjectArrayList<Object2ObjectArrayMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>>> RENDERS = new ObjectArrayList<>(TOTAL_RENDER_STAGES);
-	private static final ObjectArrayList<ObjectArrayList<Object2ObjectArrayMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>>> CURRENT_RENDERS = new ObjectArrayList<>(TOTAL_RENDER_STAGES);
+	private static final QueuedRenderLayer[] RENDER_LAYERS = QueuedRenderLayer.values();
+	private static final Identifier UNTEXTURED = new Identifier("");
+	private static final RenderCallbackPool CALLBACK_POOL = new RenderCallbackPool();
+	private static final ObjectArrayList<ObjectArrayList<Object2ObjectLinkedOpenHashMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>>> RENDERS = new ObjectArrayList<>(TOTAL_RENDER_STAGES);
+	private static final ObjectArrayList<ObjectArrayList<Object2ObjectLinkedOpenHashMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>>> CURRENT_RENDERS = new ObjectArrayList<>(TOTAL_RENDER_STAGES);
 
 	static {
 		for (int i = 0; i < TOTAL_RENDER_STAGES; i++) {
-			final int renderStageCount = QueuedRenderLayer.values().length;
-			final ObjectArrayList<Object2ObjectArrayMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>> rendersList = new ObjectArrayList<>(renderStageCount);
-			final ObjectArrayList<Object2ObjectArrayMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>> currentRendersList = new ObjectArrayList<>(renderStageCount);
+			final int renderStageCount = RENDER_LAYERS.length;
+			final ObjectArrayList<Object2ObjectLinkedOpenHashMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>> rendersList = new ObjectArrayList<>(renderStageCount);
+			final ObjectArrayList<Object2ObjectLinkedOpenHashMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>>> currentRendersList = new ObjectArrayList<>(renderStageCount);
 
 			for (int j = 0; j < renderStageCount; j++) {
-				rendersList.add(j, new Object2ObjectArrayMap<>());
-				currentRendersList.add(j, new Object2ObjectArrayMap<>());
+				rendersList.add(j, new Object2ObjectLinkedOpenHashMap<>());
+				currentRendersList.add(j, new Object2ObjectLinkedOpenHashMap<>());
 			}
 
 			RENDERS.add(i, rendersList);
@@ -113,17 +116,11 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 		RenderLifts.render(millisElapsed, cameraShakeOffset);
 		RenderRails.render();
 
-		for (int i = 0; i < TOTAL_RENDER_STAGES; i++) {
-			for (int j = 0; j < QueuedRenderLayer.values().length; j++) {
-				CURRENT_RENDERS.get(i).get(j).clear();
-				CURRENT_RENDERS.get(i).get(j).putAll(RENDERS.get(i).get(j));
-				RENDERS.get(i).get(j).clear();
-			}
-		}
+		prepareRenderQueues();
 
 		for (int i = 0; i < TOTAL_RENDER_STAGES; i++) {
-			for (int j = 0; j < QueuedRenderLayer.values().length; j++) {
-				final QueuedRenderLayer queuedRenderLayer = QueuedRenderLayer.values()[j];
+			for (int j = 0; j < RENDER_LAYERS.length; j++) {
+				final QueuedRenderLayer queuedRenderLayer = RENDER_LAYERS[j];
 				CURRENT_RENDERS.get(i).get(j).forEach((key, value) -> {
 					final RenderLayer renderLayer;
 					switch (queuedRenderLayer) {
@@ -166,14 +163,26 @@ public class MainRenderer extends EntityRenderer<EntityRendering> implements IGu
 		CustomResourceLoader.OPTIMIZED_RENDERER_WRAPPER.render(!Config.getClient().getHideTranslucentParts());
 	}
 
+	static void prepareRenderQueues() {
+		for (int i = 0; i < TOTAL_RENDER_STAGES; i++) {
+			for (int j = 0; j < RENDER_LAYERS.length; j++) {
+				final Object2ObjectLinkedOpenHashMap<Identifier, ObjectArrayList<BiConsumer<GraphicsHolder, Vector3d>>> previous = CURRENT_RENDERS.get(i).get(j);
+				previous.values().forEach(CALLBACK_POOL::recycle);
+				previous.clear();
+				CURRENT_RENDERS.get(i).set(j, RENDERS.get(i).get(j));
+				RENDERS.get(i).set(j, previous);
+			}
+		}
+	}
+
 	public static void scheduleRender(@Nullable Identifier identifier, boolean priority, QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
 		if (identifier != null) {
-			RENDERS.get(priority ? 1 : 0).get(queuedRenderLayer.ordinal()).computeIfAbsent(identifier, key -> new ObjectArrayList<>()).add(callback);
+			RENDERS.get(priority ? 1 : 0).get(queuedRenderLayer.ordinal()).computeIfAbsent(identifier, key -> CALLBACK_POOL.acquire()).add(callback);
 		}
 	}
 
 	public static void scheduleRender(QueuedRenderLayer queuedRenderLayer, BiConsumer<GraphicsHolder, Vector3d> callback) {
-		scheduleRender(new Identifier(""), false, queuedRenderLayer, callback);
+		scheduleRender(UNTEXTURED, false, queuedRenderLayer, callback);
 	}
 
 	public static void cancelRender(Identifier identifier) {

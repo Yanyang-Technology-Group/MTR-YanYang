@@ -20,6 +20,7 @@ public abstract class RenderRouteBase<T extends BlockPSDTop.BlockEntityBase> ext
 	private final boolean transparentWhite;
 	private final int platformSearchYOffset;
 	private final IntegerProperty arrowDirectionProperty;
+	private final Object leftSpanCacheKey = new Object(), rightSpanCacheKey = new Object();
 
 	public RenderRouteBase(Argument dispatcher, float z, float topPadding, float bottomPadding, float sidePadding, boolean transparentWhite, int platformSearchYOffset, IntegerProperty arrowDirectionProperty) {
 		super(dispatcher);
@@ -40,6 +41,9 @@ public abstract class RenderRouteBase<T extends BlockPSDTop.BlockEntityBase> ext
 		}
 
 		final BlockPos blockPos = entity.getPos2();
+		if ((getClass() == RenderPSDTop.class || getClass() == RenderAPGGlass.class) && !BlockEntityRenderCulling.isVisible(world, blockPos, 1)) {
+			return;
+		}
 		final BlockState state = world.getBlockState(blockPos);
 		final Direction facing = IBlock.getStatePropertySafe(state, DirectionHelper.FACING);
 
@@ -112,6 +116,14 @@ public abstract class RenderRouteBase<T extends BlockPSDTop.BlockEntityBase> ext
 	private int getTextureNumber(World world, BlockPos pos, Direction facing, boolean searchLeft) {
 		int number = 0;
 		final Block thisBlock = world.getBlockState(pos).getBlock();
+		final RouteMapSpanCache spans = getClass() == RenderPSDTop.class || getClass() == RenderAPGGlass.class ? BlockEntityRenderCulling.routeSpans(world, searchLeft ? leftSpanCacheKey : rightSpanCacheKey) : null;
+		if (spans != null) {
+			return spans.distance(pos.data, (searchLeft ? facing.rotateYCounterclockwise() : facing.rotateYClockwise()).data, cursor -> {
+				final BlockState state = world.getBlockState(new BlockPos(cursor));
+				if (!state.getBlock().equals(thisBlock)) return 0;
+				return 1 | ((searchLeft ? isLeft(state) : isRight(state)) ? 2 : 0) | ((searchLeft ? isRight(state) : isLeft(state)) ? 4 : 0);
+			});
+		}
 
 		while (true) {
 			final BlockState state = world.getBlockState(pos.offset(searchLeft ? facing.rotateYCounterclockwise() : facing.rotateYClockwise(), number));

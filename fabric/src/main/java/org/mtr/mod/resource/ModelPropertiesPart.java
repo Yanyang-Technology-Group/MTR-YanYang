@@ -206,6 +206,10 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	}
 
 	public void render(Identifier texture, StoredMatrixTransformations storedMatrixTransformations, @Nullable VehicleExtension vehicle, int carNumber, int[] scrollingDisplayIndexTracker, int light, ObjectArrayList<ObjectDoubleImmutablePair<Box>> openDoorways, boolean fromResourcePackCreator) {
+		// The optimized body already contains every static part and closed door.
+		if (type == PartType.NORMAL && OptimizedRenderer.hasOptimizedRendering() && (openDoorways.isEmpty() || !isDoor())) {
+			return;
+		}
 		if (vehicle == null || VehicleResource.matchesCondition(vehicle, condition, openDoorways.isEmpty())) {
 			switch (type) {
 				case NORMAL:

@@ -12,6 +12,10 @@ import org.mtr.mod.data.IGui;
 public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> extends BlockEntityRenderer<T> implements IGui, IBlock {
 
 	private final int type;
+	private final Identifier[][][] doorTextures = new Identifier[3][2][2];
+	private static final Identifier[] LIGHT_TEXTURES = {new Identifier("mtr:textures/block/light_off.png"), new Identifier("mtr:textures/block/light_on.png")};
+	private static final Identifier[] APG_LIGHT_TEXTURES = {new Identifier("mtr:textures/block/apg_door_light_off.png"), new Identifier("mtr:textures/block/apg_door_light_on.png")};
+	private static final Identifier LOCKED_TEXTURE = new Identifier(Init.MOD_ID, "textures/block/sign/door_not_in_use.png");
 	private static final ModelSingleCube MODEL_PSD = new ModelSingleCube(36, 18, 0, 0, 0, 16, 16, 2);
 	private static final ModelSingleCube MODEL_PSD_END_LEFT_1 = new ModelSingleCube(20, 18, 0, 0, 0, 8, 16, 2);
 	private static final ModelSingleCube MODEL_PSD_END_RIGHT_1 = new ModelSingleCube(20, 18, 8, 0, 0, 8, 16, 2);
@@ -30,6 +34,21 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 	public RenderPSDAPGDoor(Argument dispatcher, int type) {
 		super(dispatcher);
 		this.type = type;
+		for (int half = 0; half < 2; half++) {
+			for (int side = 0; side < 2; side++) {
+				final String halfName = half == 0 ? "bottom" : "top";
+				final String sideName = side == 0 ? "left" : "right";
+				if (type == 0 || type == 1) {
+					final String variant = type == 1 ? "2" : "1";
+					doorTextures[0][half][side] = new Identifier("mtr:textures/block/psd_door_" + halfName + "_" + sideName + "_" + variant + ".png");
+					for (int part = 1; part <= 2; part++) {
+						doorTextures[part][half][side] = new Identifier("mtr:textures/block/psd_door_end_" + halfName + "_" + sideName + "_" + part + "_" + variant + ".png");
+					}
+				} else {
+					doorTextures[0][half][side] = new Identifier("mtr:textures/block/" + (type == 2 ? "apg_door_" : "lift_door_") + halfName + "_" + sideName + (type == 2 ? "" : "_1") + ".png");
+				}
+			}
+		}
 	}
 
 	@Override
@@ -42,11 +61,16 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 		entity.tick(tickDelta);
 
 		final BlockPos blockPos = entity.getPos2();
-		final Direction facing = IBlock.getStatePropertySafe(world, blockPos, BlockPSDAPGDoorBase.FACING);
-		final boolean side = IBlock.getStatePropertySafe(world, blockPos, BlockPSDAPGDoorBase.SIDE) == EnumSide.RIGHT;
-		final boolean half = IBlock.getStatePropertySafe(world, blockPos, BlockPSDAPGDoorBase.HALF) == DoubleBlockHalf.UPPER;
-		final boolean end = IBlock.getStatePropertySafe(world, blockPos, BlockPSDAPGDoorBase.END);
-		final boolean unlocked = IBlock.getStatePropertySafe(world, blockPos, BlockPSDAPGDoorBase.UNLOCKED);
+		// Include the complete door travel and end panels; animation still ticks off screen.
+		if (getClass() == RenderPSDAPGDoor.class && !BlockEntityRenderCulling.isVisible(world, blockPos, 2)) {
+			return;
+		}
+		final BlockState state = world.getBlockState(blockPos);
+		final Direction facing = IBlock.getStatePropertySafe(state, BlockPSDAPGDoorBase.FACING);
+		final boolean side = IBlock.getStatePropertySafe(state, BlockPSDAPGDoorBase.SIDE) == EnumSide.RIGHT;
+		final boolean half = IBlock.getStatePropertySafe(state, BlockPSDAPGDoorBase.HALF) == DoubleBlockHalf.UPPER;
+		final boolean end = IBlock.getStatePropertySafe(state, BlockPSDAPGDoorBase.END);
+		final boolean unlocked = IBlock.getStatePropertySafe(state, BlockPSDAPGDoorBase.UNLOCKED);
 		final double open = Math.min(entity.getDoorValue(), type >= 3 ? 0.75F : 1);
 
 		final StoredMatrixTransformations storedMatrixTransformations = new StoredMatrixTransformations(0.5 + entity.getPos2().getX(), entity.getPos2().getY(), 0.5 + entity.getPos2().getZ());
@@ -60,14 +84,14 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 			case 0:
 			case 1:
 				if (half) {
-					MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/light_%s.png", open > 0 ? "on" : "off")), false, open > 0 ? QueuedRenderLayer.LIGHT : QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(LIGHT_TEXTURES[open > 0 ? 1 : 0], false, open > 0 ? QueuedRenderLayer.LIGHT : QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformationsLight.transform(graphicsHolderNew, offset);
 						(side ? MODEL_PSD_LIGHT_RIGHT : MODEL_PSD_LIGHT_LEFT).render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 						graphicsHolderNew.pop();
 					});
 				}
 				if (end) {
-					MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/psd_door_end_%s_%s_2_%s.png", half ? "top" : "bottom", side ? "right" : "left", type == 1 ? "2" : "1")), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(doorTextures[2][half ? 1 : 0][side ? 1 : 0], false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformationsLight.transform(graphicsHolderNew, offset);
 						graphicsHolderNew.translate(open / 2 * (side ? -1 : 1), 0, 0);
 						(side ? MODEL_PSD_END_RIGHT_2 : MODEL_PSD_END_LEFT_2).render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
@@ -79,7 +103,7 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 				if (half) {
 					final Block block = world.getBlockState(blockPos.offset(side ? facing.rotateYClockwise() : facing.rotateYCounterclockwise())).getBlock();
 					if (block.data instanceof BlockAPGGlass || block.data instanceof BlockAPGGlassEnd) {
-						MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/apg_door_light_%s.png", open > 0 ? "on" : "off")), false, open > 0 ? QueuedRenderLayer.LIGHT_TRANSLUCENT : QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+						MainRenderer.scheduleRender(APG_LIGHT_TEXTURES[open > 0 ? 1 : 0], false, open > 0 ? QueuedRenderLayer.LIGHT_TRANSLUCENT : QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 							storedMatrixTransformationsLight.transform(graphicsHolderNew, offset);
 							graphicsHolderNew.translate(side ? -0.515625 : 0.515625, 0, 0);
 							graphicsHolderNew.scale(0.5F, 1, 1);
@@ -97,20 +121,20 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 			case 0:
 			case 1:
 				if (end) {
-					MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/psd_door_end_%s_%s_1_%s.png", half ? "top" : "bottom", side ? "right" : "left", type == 1 ? "2" : "1")), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(doorTextures[1][half ? 1 : 0][side ? 1 : 0], false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformations.transform(graphicsHolderNew, offset);
 						(side ? MODEL_PSD_END_RIGHT_1 : MODEL_PSD_END_LEFT_1).render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 						graphicsHolderNew.pop();
 					});
 				} else {
-					MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/psd_door_%s_%s_%s.png", half ? "top" : "bottom", side ? "right" : "left", type == 1 ? "2" : "1")), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(doorTextures[0][half ? 1 : 0][side ? 1 : 0], false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformations.transform(graphicsHolderNew, offset);
 						MODEL_PSD.render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 						graphicsHolderNew.pop();
 					});
 				}
 				if (half && !unlocked) {
-					MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, "textures/block/sign/door_not_in_use.png"), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(LOCKED_TEXTURE, false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformations.transform(graphicsHolderNew, offset);
 						if (end) {
 							graphicsHolderNew.translate(side ? 0.25 : -0.25, 0, 0);
@@ -121,13 +145,13 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 				}
 				break;
 			case 2:
-				MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/apg_door_%s_%s.png", half ? "top" : "bottom", side ? "right" : "left")), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+				MainRenderer.scheduleRender(doorTextures[0][half ? 1 : 0][side ? 1 : 0], false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 					storedMatrixTransformations.transform(graphicsHolderNew, offset);
 					(half ? MODEL_APG_TOP : MODEL_APG_BOTTOM).render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 					graphicsHolderNew.pop();
 				});
 				if (half && !unlocked) {
-					MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, "textures/block/sign/door_not_in_use.png"), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(LOCKED_TEXTURE, false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformations.transform(graphicsHolderNew, offset);
 						MODEL_APG_DOOR_LOCKED.render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 						graphicsHolderNew.pop();
@@ -135,18 +159,18 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
 				}
 				break;
 			case 4:
-				if (IBlock.getStatePropertySafe(world, blockPos, TripleHorizontalBlock.CENTER)) {
+				if (IBlock.getStatePropertySafe(state, TripleHorizontalBlock.CENTER)) {
 					break;
 				}
 				storedMatrixTransformations.add(matricesNew -> matricesNew.translate(side ? 0.5 : -0.5, 0, 0));
 			case 3:
-				MainRenderer.scheduleRender(new Identifier(String.format("mtr:textures/block/lift_door_%s_%s_1.png", half ? "top" : "bottom", side ? "right" : "left")), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+				MainRenderer.scheduleRender(doorTextures[0][half ? 1 : 0][side ? 1 : 0], false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 					storedMatrixTransformations.transform(graphicsHolderNew, offset);
 					(side ? MODEL_LIFT_RIGHT : MODEL_LIFT_LEFT).render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
 					graphicsHolderNew.pop();
 				});
 				if (half && !unlocked) {
-					MainRenderer.scheduleRender(new Identifier(Init.MOD_ID, "textures/block/sign/door_not_in_use.png"), false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
+					MainRenderer.scheduleRender(LOCKED_TEXTURE, false, QueuedRenderLayer.EXTERIOR, (graphicsHolderNew, offset) -> {
 						storedMatrixTransformations.transform(graphicsHolderNew, offset);
 						graphicsHolderNew.translate(side ? 0.125 : -0.125, 0, 0);
 						MODEL_PSD_DOOR_LOCKED.render(graphicsHolderNew, light, overlay, 1, 1, 1, 1);
