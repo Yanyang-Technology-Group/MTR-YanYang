@@ -10,6 +10,10 @@ import org.mtr.mapping.mapper.MinecraftClientHelper;
 import org.mtr.mod.CustomThread;
 import org.mtr.mod.Init;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -25,7 +29,14 @@ public final class WorkerThread extends CustomThread {
 	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueLift = new ObjectArrayList<>();
 	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueMisc = new ObjectArrayList<>();
 	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueRail = new ObjectArrayList<>();
-	private final ObjectArrayList<Runnable> dynamicTextureQueue = new ObjectArrayList<>();
+	// A rail visibility pass can take seconds in a large network. Texture generation
+	// must not wait for it, but must remain serial because the generators share state.
+	private final ExecutorService dynamicTextureExecutor = new ThreadPoolExecutor(0, 1, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), runnable -> {
+		final Thread thread = new Thread(runnable, "MTR Dynamic Textures");
+		thread.setDaemon(true);
+		thread.setPriority(Thread.NORM_PRIORITY);
+		return thread;
+	});
 
 	@Override
 	protected void runTick() {
@@ -42,8 +53,6 @@ public final class WorkerThread extends CustomThread {
 			run(occlusionQueueRail, task -> task.accept(occlusionCullingInstance));
 			run(occlusionQueueMisc, task -> task.accept(occlusionCullingInstance));
 		}
-
-		run(dynamicTextureQueue, Runnable::run);
 	}
 
 	@Override
@@ -77,7 +86,13 @@ public final class WorkerThread extends CustomThread {
 	}
 
 	public void scheduleDynamicTextures(Runnable runnable) {
-		dynamicTextureQueue.add(runnable);
+		dynamicTextureExecutor.execute(() -> {
+			try {
+				runnable.run();
+			} catch (Exception e) {
+				Init.LOGGER.error("Could not generate dynamic texture", e);
+			}
+		});
 	}
 
 	private void updateInstance() {

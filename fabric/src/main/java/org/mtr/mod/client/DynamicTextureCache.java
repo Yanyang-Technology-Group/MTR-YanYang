@@ -244,6 +244,8 @@ public class DynamicTextureCache implements IGui {
 		}
 
 		MainRenderer.WORKER_THREAD.scheduleDynamicTextures(() -> {
+			// Initialize on the same serial worker as generation, before a task can use them.
+			RouteMapGenerator.setConstants();
 			while (font == null) {
 				ResourceManagerHelper.readResource(new Identifier(Init.MOD_ID, "font/noto-sans-semibold.ttf"), inputStream -> {
 					try {
@@ -298,7 +300,6 @@ public class DynamicTextureCache implements IGui {
 				generatingResources.remove(key);
 			});
 		});
-		RouteMapGenerator.setConstants();
 		generatingResources.add(key);
 
 		if (dynamicResource == null) {
