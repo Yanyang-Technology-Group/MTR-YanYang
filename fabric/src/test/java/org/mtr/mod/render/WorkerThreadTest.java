@@ -7,10 +7,79 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class WorkerThreadTest {
+	@Test
+	void requestsSubmittedWhileAVisibilityTaskRunsAreNotLost() throws Exception {
+		final WorkerThread worker = new WorkerThread();
+		final CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+		final List<Integer> executed = new ArrayList<>();
+		final AtomicReference<Throwable> failure = new AtomicReference<>();
+		worker.scheduleVehicles(ignored -> {
+			started.countDown();
+			try {
+				release.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			executed.add(0);
+		});
+		final var field = worker.getClass().getDeclaredField("occlusionQueueVehicle");
+		field.setAccessible(true);
+		final var run = worker.getClass().getDeclaredMethod("run", field.getType(), Consumer.class);
+		run.setAccessible(true);
+		final Consumer<Consumer<Object>> execute = task -> task.accept(null);
+		final Thread consumer = new Thread(() -> {
+			try {
+				run.invoke(null, field.get(worker), execute);
+			} catch (Throwable e) {
+				failure.set(e);
+			}
+		});
+		consumer.start();
+		try {
+			assertTrue(started.await(5, TimeUnit.SECONDS));
+			worker.scheduleVehicles(ignored -> executed.add(1));
+			worker.scheduleVehicles(ignored -> executed.add(2));
+		} finally {
+			release.countDown();
+			consumer.join(5000);
+		}
+		assertFalse(consumer.isAlive());
+		assertNull(failure.get());
+		run.invoke(null, field.get(worker), execute);
+		assertEquals(List.of(0, 2), executed);
+	}
+
+	@Test
+	void visibilityQueuesUseTheLatestCameraRequest() throws Exception {
+		final WorkerThread worker = new WorkerThread();
+		for (String category : new String[]{"Vehicle", "Lift", "Rail", "Misc"}) {
+			final List<Integer> executed = new ArrayList<>();
+			final String method = switch (category) {
+				case "Vehicle" -> "scheduleVehicles";
+				case "Lift" -> "scheduleLifts";
+				case "Rail" -> "scheduleMTRRails";
+				default -> "scheduleRails";
+			};
+			for (int i = 0; i < 100; i++) {
+				final int frame = i;
+				worker.getClass().getMethod(method, Consumer.class).invoke(worker, (Consumer<Object>) ignored -> executed.add(frame));
+			}
+			final var field = worker.getClass().getDeclaredField("occlusionQueue" + category);
+			field.setAccessible(true);
+			final var run = worker.getClass().getDeclaredMethod("run", field.getType(), Consumer.class);
+			run.setAccessible(true);
+			final Consumer<Consumer<Object>> execute = task -> task.accept(null);
+			run.invoke(null, field.get(worker), execute);
+			run.invoke(null, field.get(worker), execute);
+			assertEquals(List.of(99), executed, category + " queue retained stale camera requests");
+		}
+	}
+
 	@Test
 	void generatesTexturesWithoutWaitingForAnOcclusionTick() throws Exception {
 		final WorkerThread worker = new WorkerThread();

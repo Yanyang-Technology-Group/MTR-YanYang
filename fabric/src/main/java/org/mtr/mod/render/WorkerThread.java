@@ -2,7 +2,6 @@ package org.mtr.mod.render;
 
 import com.logisticscraft.occlusionculling.DataProvider;
 import com.logisticscraft.occlusionculling.OcclusionCullingInstance;
-import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.client.world.ClientWorld;
 import org.mtr.mapping.holder.MinecraftClient;
@@ -14,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -22,13 +22,13 @@ import java.util.function.Consumer;
 public final class WorkerThread extends CustomThread {
 
 	private static final int MAX_OCCLUSION_CHUNK_DISTANCE = 32;
-	private static final int MAX_QUEUE_SIZE = 2;
 	private int renderDistance;
 	private OcclusionCullingInstance occlusionCullingInstance;
-	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueVehicle = new ObjectArrayList<>();
-	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueLift = new ObjectArrayList<>();
-	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueMisc = new ObjectArrayList<>();
-	private final ObjectArrayList<Consumer<OcclusionCullingInstance>> occlusionQueueRail = new ObjectArrayList<>();
+	// Visibility requests are complete snapshots. Only the latest pending frame is useful.
+	private final AtomicReference<Consumer<OcclusionCullingInstance>> occlusionQueueVehicle = new AtomicReference<>();
+	private final AtomicReference<Consumer<OcclusionCullingInstance>> occlusionQueueLift = new AtomicReference<>();
+	private final AtomicReference<Consumer<OcclusionCullingInstance>> occlusionQueueMisc = new AtomicReference<>();
+	private final AtomicReference<Consumer<OcclusionCullingInstance>> occlusionQueueRail = new AtomicReference<>();
 	// A rail visibility pass can take seconds in a large network. Texture generation
 	// must not wait for it, but must remain serial because the generators share state.
 	private final ExecutorService dynamicTextureExecutor = new ThreadPoolExecutor(0, 1, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), runnable -> {
@@ -45,7 +45,7 @@ public final class WorkerThread extends CustomThread {
 		} catch (InterruptedException e) {
 		}
 
-		if (!occlusionQueueVehicle.isEmpty() || !occlusionQueueLift.isEmpty() || !occlusionQueueMisc.isEmpty() || !occlusionQueueRail.isEmpty()) {
+		if (occlusionQueueVehicle.get() != null || occlusionQueueLift.get() != null || occlusionQueueMisc.get() != null || occlusionQueueRail.get() != null) {
 			updateInstance();
 			occlusionCullingInstance.resetCache();
 			run(occlusionQueueVehicle, task -> task.accept(occlusionCullingInstance));
@@ -61,28 +61,20 @@ public final class WorkerThread extends CustomThread {
 	}
 
 	public void scheduleVehicles(Consumer<OcclusionCullingInstance> consumer) {
-		if (occlusionQueueVehicle.size() < MAX_QUEUE_SIZE) {
-			occlusionQueueVehicle.add(consumer);
-		}
+		occlusionQueueVehicle.set(consumer);
 	}
 
 	public void scheduleLifts(Consumer<OcclusionCullingInstance> consumer) {
-		if (occlusionQueueLift.size() < MAX_QUEUE_SIZE) {
-			occlusionQueueLift.add(consumer);
-		}
+		occlusionQueueLift.set(consumer);
 	}
 
 	@Deprecated
 	public void scheduleRails(Consumer<OcclusionCullingInstance> consumer) {
-		if (occlusionQueueMisc.size() < MAX_QUEUE_SIZE) {
-			occlusionQueueMisc.add(consumer);
-		}
+		occlusionQueueMisc.set(consumer);
 	}
 
 	public void scheduleMTRRails(Consumer<OcclusionCullingInstance> consumer) {
-		if (occlusionQueueRail.size() < MAX_QUEUE_SIZE) {
-			occlusionQueueRail.add(consumer);
-		}
+		occlusionQueueRail.set(consumer);
 	}
 
 	public void scheduleDynamicTextures(Runnable runnable) {
@@ -99,17 +91,15 @@ public final class WorkerThread extends CustomThread {
 		final int newRenderDistance = MinecraftClientHelper.getRenderDistance();
 		if (occlusionCullingInstance == null || renderDistance != newRenderDistance) {
 			renderDistance = newRenderDistance;
-			occlusionCullingInstance = new OcclusionCullingInstance(Math.min(renderDistance, MAX_OCCLUSION_CHUNK_DISTANCE) * 16, new CullingDataProvider());
+			occlusionCullingInstance = new BoundedOcclusionCullingInstance(Math.min(renderDistance, MAX_OCCLUSION_CHUNK_DISTANCE) * 16, new CullingDataProvider());
 		}
 	}
 
-	private static <T> void run(ObjectArrayList<T> queue, Consumer<T> consumer) {
-		if (!queue.isEmpty()) {
+	private static <T> void run(AtomicReference<T> queue, Consumer<T> consumer) {
+		final T task = queue.getAndSet(null);
+		if (task != null) {
 			try {
-				final T task = queue.remove(0);
-				if (task != null) {
-					consumer.accept(task);
-				}
+				consumer.accept(task);
 			} catch (Exception e) {
 				Init.LOGGER.error("", e);
 			}
