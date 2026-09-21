@@ -6,10 +6,57 @@ import com.logisticscraft.occlusionculling.cache.OcclusionCache;
 import com.logisticscraft.occlusionculling.util.Vec3d;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BoundedOcclusionCullingInstanceTest {
 	private final Vec3d camera = new Vec3d(0.5, 0.5, 0.5);
+
+	@Test
+	void raysStartingInsideSolidBlocksReuseOpacityUntilTheNextPass() {
+		final CountingWorld world = new CountingWorld();
+		final BoundedOcclusionCullingInstance culling = new BoundedOcclusionCullingInstance(64, world);
+		final OcclusionCullingInstance original = new OcclusionCullingInstance(64, new CountingWorld());
+		for (int z = -8; z <= 8; z++) {
+			final Vec3d min = new Vec3d(10, 0, z), max = new Vec3d(11, 1, z + 1);
+			assertEquals(original.isAABBVisible(min, max, camera), culling.isAABBVisible(min, max, camera));
+		}
+		assertEquals(1, world.reads.get("0,0,0"), "All rays start in the same solid block");
+		culling.resetCache();
+		culling.isAABBVisible(new Vec3d(10, 0, 0), new Vec3d(11, 1, 1), camera);
+		assertEquals(2, world.reads.get("0,0,0"), "A new pass must read the world again");
+	}
+
+	@Test
+	void opacityChangesBecomeVisibleOnTheNextPass() {
+		final CountingWorld world = new CountingWorld();
+		final BoundedOcclusionCullingInstance culling = new BoundedOcclusionCullingInstance(64, world);
+		final Vec3d min = new Vec3d(10, 0, 0), max = new Vec3d(11, 1, 1);
+		world.wall = true;
+		assertFalse(culling.isAABBVisible(min, max, camera));
+		world.wall = false;
+		culling.resetCache();
+		assertTrue(culling.isAABBVisible(min, max, camera));
+		world.wall = true;
+		culling.resetCache();
+		assertFalse(culling.isAABBVisible(min, max, camera));
+	}
+
+	private static final class CountingWorld implements DataProvider {
+		private final Map<String, Integer> reads = new HashMap<>();
+		private boolean wall;
+
+		@Override
+		public boolean prepareChunk(int x, int z) { return true; }
+
+		@Override
+		public boolean isOpaqueFullCube(int x, int y, int z) {
+			reads.merge(x + "," + y + "," + z, 1, Integer::sum);
+			return x <= 2 || (wall && x == 5);
+		}
+	}
 
 	@Test
 	void oversizedRailBoundsCannotBlockOtherVisibilityUpdates() throws Exception {

@@ -6,8 +6,11 @@
 	"client": [
 		"OcclusionSafepointMixin",
 		"PathDataIdMixin",
+		"MagicRailTiltRegistryMixin",
 		"OptimizedShaderManagerMixin",
 		"OptimizedBatchManagerMixin",
+		"VertexAttributeStateMixin",
+		"MaterialPropertiesMixin",
 		"IrisGraphAccessor",
 		"IrisFeedbackArcSetMixin",
 		"IrisFeedbackTraversalMixin",

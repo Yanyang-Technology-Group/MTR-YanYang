@@ -7,12 +7,24 @@ import com.logisticscraft.occlusionculling.util.Vec3d;
 final class BoundedOcclusionCullingInstance extends OcclusionCullingInstance {
 	private static final int MAX_SCAN_VOXELS = 65_536;
 	private final int reach;
+	private final CachedCullingDataProvider cachedProvider;
 	// The library's default constructor expands each side by half a block.
 	private static final double EXPANSION = 0.5;
 
 	BoundedOcclusionCullingInstance(int maxDistance, DataProvider provider) {
+		this(maxDistance, new CachedCullingDataProvider(provider));
+	}
+
+	private BoundedOcclusionCullingInstance(int maxDistance, CachedCullingDataProvider provider) {
 		super(maxDistance, provider);
+		cachedProvider = provider;
 		reach = maxDistance - 2;
+	}
+
+	@Override
+	public void resetCache() {
+		super.resetCache();
+		cachedProvider.resetCache();
 	}
 
 	@Override

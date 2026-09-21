@@ -32,25 +32,51 @@ public final class IndexedFeedbackGraph {
 		if (indexed == null) {
 			return original.apply(graph, weights);
 		}
-		final MutableGraph numbered;
 		final MutableGraph restored;
+		final Constructor<?> constructor;
 		try {
 			// Reflect only the optional library's constructor; all edge operations use maps.
-			final Constructor<?> constructor = graph.getClass().getConstructor();
-			numbered = (MutableGraph) constructor.newInstance();
+			constructor = graph.getClass().getConstructor();
 			restored = (MutableGraph) constructor.newInstance();
 		} catch (ReflectiveOperationException exception) {
 			return original.apply(graph, weights);
 		}
-		numbered.mtr$getVertices().putAll(indexed.vertices);
-		numbered.mtr$setEdgeCount(indexed.edgeCount);
+		final int[] order = ArrayFeedbackArcSet.solve(indexed.vertices);
+		if (order != null) {
+			final boolean[] seen = new boolean[order.length];
+			for (int source : order) {
+				seen[source] = true;
+				for (Object2IntMap.Entry<Object> edge : indexed.vertices.get(source).object2IntEntrySet()) {
+					final int target = (Integer) edge.getKey();
+					if (!seen[target]) {
+						// Match MapDigraph.put: insert the source, then its target,
+						// including targets which never have outgoing feedback edges.
+						restored.mtr$getVertices().computeIfAbsent(indexed.originals[source], ignored -> newEdges()).put(indexed.originals[target], edge.getIntValue());
+						restored.mtr$getVertices().computeIfAbsent(indexed.originals[target], ignored -> newEdges());
+					}
+				}
+			}
+		} else {
+			final MutableGraph numbered;
+			try {
+				numbered = (MutableGraph) constructor.newInstance();
+			} catch (ReflectiveOperationException exception) {
+				return original.apply(graph, weights);
+			}
+			numbered.mtr$getVertices().putAll(indexed.vertices);
+			numbered.mtr$setEdgeCount(indexed.edgeCount);
 			final Object result = FeedbackGraphTraversal.duringSolve(() -> original.apply(numbered, numbered));
-		if (!(result instanceof RenderOrderCache.Graph)) {
-			return original.apply(graph, weights);
+			if (!(result instanceof RenderOrderCache.Graph)) return original.apply(graph, weights);
+			restored.mtr$getVertices().putAll(indexed.restore((RenderOrderCache.Graph) result));
 		}
-		restored.mtr$getVertices().putAll(indexed.restore((RenderOrderCache.Graph) result));
 		restored.mtr$setEdgeCount(restored.mtr$getVertices().values().stream().mapToInt(Map::size).sum());
 		return restored;
+	}
+
+	private static Object2IntMap<Object> newEdges() {
+		final Object2IntMap<Object> edges = new Object2IntLinkedOpenHashMap<>();
+		edges.defaultReturnValue(Integer.MIN_VALUE);
+		return edges;
 	}
 
 	static IndexedFeedbackGraph index(RenderOrderCache.Graph graph, RenderOrderCache.Graph weights) {
