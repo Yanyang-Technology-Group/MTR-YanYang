@@ -16,6 +16,7 @@ loom {
 }
 
 dependencies {
+	shadowImplementation "org.mtr:tsc-path-computation:1.0.0"
 	minecraft "com.mojang:minecraft:${minecraftVersion}"
 	mappings "net.fabricmc:yarn:${buildTools.getYarnVersion()}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${buildTools.getFabricVersion()}"
@@ -46,6 +47,38 @@ java {
 	}
 	withSourcesJar()
 	withJavadocJar()
+}
+
+if (project.hasProperty("pathIntegrationTest")) {
+	loom {
+		mods {
+			mtr { sourceSet sourceSets.main }
+			mtrPathTest { sourceSet sourceSets.test }
+		}
+		runs {
+			pathTest {
+				server()
+				source sourceSets.test
+				runDir "build/path-integration"
+				vmArg "-Dmtr.path.workers=4"
+				vmArg "-Dmtr.path.metrics=true"
+			}
+		}
+	}
+	tasks.named("runPathTest", JavaExec) {
+		javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+	}
+}
+
+tasks.register("pathBenchmark", JavaExec) {
+	dependsOn testClasses
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = "org.mtr.mod.data.PathBenchmark"
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+processTestResources {
+	rename "mtr-path-test.mod.json", "fabric.mod.json"
 }
 
 tasks.register("setupWebsiteFiles") {

@@ -15,3 +15,6 @@ include("fabric")
 include("forge")
 
 rootProject.name = "Minecraft-Transit-Railway"
+
+// Only the dependency-free Java 17 compute module is shared with the newer TSC checkout.
+includeBuild("../Transport-Simulation-Core/path-computation")
