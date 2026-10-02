@@ -16,7 +16,6 @@ loom {
 }
 
 dependencies {
-	shadowImplementation "org.mtr:tsc-path-computation:1.0.0"
 	minecraft "com.mojang:minecraft:${minecraftVersion}"
 	mappings "net.fabricmc:yarn:${buildTools.getYarnVersion()}:v2"
 	modImplementation "net.fabricmc:fabric-loader:${buildTools.getFabricVersion()}"
@@ -26,7 +25,7 @@ dependencies {
 	testImplementation "org.junit.jupiter:junit-jupiter-api:5.+"
 	testImplementation "org.junit.platform:junit-platform-launcher:1.+"
 	testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.+"
-	testImplementation "maven.modrinth:iris:1.7.6+1.20.1"
+	testImplementation "maven.modrinth:iris:${minecraftVersion == '1.20.4' ? '1.7.2+1.20.4' : '1.7.6+1.20.1'}"
 
 	if (buildTools.hasJadeSupport()) {
 		modCompileOnly "maven.modrinth:jade:${buildTools.getJadeVersion()}"
@@ -66,7 +65,7 @@ if (project.hasProperty("pathIntegrationTest")) {
 		}
 	}
 	tasks.named("runPathTest", JavaExec) {
-		javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+		javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(buildTools.javaLanguageVersion) }
 	}
 }
 
@@ -74,7 +73,7 @@ tasks.register("pathBenchmark", JavaExec) {
 	dependsOn testClasses
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = "org.mtr.mod.data.PathBenchmark"
-	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(buildTools.javaLanguageVersion) }
 }
 
 processTestResources {
@@ -105,7 +104,7 @@ tasks.register("setupFiles") {
 		outputs.upToDateWhen { false }
 		from "src/main/fabric.mod.template.json"
 		into "src/main/resources"
-		filter(ReplaceTokens, tokens: ["minecraft": minecraftVersion, "version": version])
+		filter(ReplaceTokens, tokens: ["minecraft": minecraftVersion, "version": version, "java": buildTools.javaLanguageVersion.toString()])
 		rename "(.+).template.json", "\$1.json"
 	}
 

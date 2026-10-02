@@ -13,6 +13,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@main
+      - name: Checkout path computation dependency
+        uses: actions/checkout@v4
+        with:
+          repository: Yanyang-Technology-Group/Transport-Simulation-Core
+          ref: 3ab979e470e4ba5539cb7ff69c9bd83d4c26e35e
+          path: Transport-Simulation-Core
+      - name: Configure path computation dependency
+        run: echo "pathComputationDir=Transport-Simulation-Core/path-computation" >> gradle.properties
       - name: Validate gradle wrapper
         uses: gradle/wrapper-validation-action@main
       - name: Setup JDK 21

@@ -4,7 +4,7 @@
 
 ## 中文
 
-MTR-YanYang 是 [Minecraft Transit Railway（MTR）](https://github.com/Minecraft-Transit-Railway/Minecraft-Transit-Railway) 的社区优化分支，基于 MTR 4.0.5，当前优化与验证目标为 **Minecraft 1.20.1 Fabric**。
+MTR-YanYang 是 [Minecraft Transit Railway（MTR）](https://github.com/Minecraft-Transit-Railway/Minecraft-Transit-Railway) 的社区优化分支，基于 MTR 4.0.5。性能优化基线为 **Minecraft 1.20.1 Fabric**；**Fabric 1.20.4 已通过源码构建和回归测试**，尚待游戏内验证。1.21.1、1.21.4 的映射层迁移尚未完成。
 
 本分支重点改善密集车站、多站台、多轨道和多列车场景中的渲染开销、临时内存分配及服务端寻路计算。MTR 4.0 的基础架构来自上游；以下列出本分支提交的优化。
 
@@ -26,7 +26,7 @@ MTR-YanYang 是 [Minecraft Transit Railway（MTR）](https://github.com/Minecraf
 
 ### 下载与安装
 
-从 [Releases](https://github.com/Yanyang-Technology-Group/MTR-YanYang/releases) 下载适用于 **Fabric 1.20.1** 的运行 jar，安装 Fabric Loader 和 Fabric API 后，将 jar 放入 `mods` 文件夹并重启游戏或服务器。替换已有 MTR 时只保留一个 MTR 运行 jar，不要安装 sources jar。
+从 [Releases](https://github.com/Yanyang-Technology-Group/MTR-YanYang/releases) 下载对应 Minecraft 版本的 `YYMTR-fabric-4.0.5+<minecraft-version>-performance12.jar`，安装 Fabric Loader 和 Fabric API 后，将 jar 放入 `mods` 文件夹并重启游戏或服务器。替换已有 MTR 时只保留一个 MTR 运行 jar，不要安装 sources jar。
 
 仓库最新代码可能包含尚未进入 Release 的改动，请以对应 Release 的说明为准。
 
@@ -44,6 +44,8 @@ JVM 可用处理器数不超过 2，或启用了已有的 threaded simulation �
 
 ### 源码构建
 
+1.20.4 构建方式及 1.21.1 / 1.21.4 尚待完成的映射层迁移见 [版本兼容说明](docs/version-compatibility.md)。目前不能将修改版本号等同于完成 1.21 兼容。
+
 构建需同时检出 [TSC 二改仓库](https://github.com/Yanyang-Technology-Group/Transport-Simulation-Core)，并保留以下相邻目录结构：
 
 ```text
@@ -53,15 +55,15 @@ MTR/
     └── path-computation/
 ```
 
-MTR 通过 Gradle composite build 引用 `path-computation`，只引入该独立 Java 17 计算模块。构建工具需要 JDK 21，并需要 Java 17 工具链用于 Fabric 1.20.1 目标；还需满足项目现有 MTR 映射库及构建依赖。
+MTR 通过 Gradle composite build 引用 `path-computation`，只引入该独立 Java 17 计算模块。构建工具需要 JDK 21；Fabric 1.20.1 和 1.20.4 使用 Java 17 工具链，请同时安装两个 JDK。Minecraft 1.21.x 要求 Java 21，但本分支尚不支持其映射层。还需满足项目现有 MTR 映射库及构建依赖。
 
 在 `Minecraft-Transit-Railway` 目录执行：
 
 ```sh
-./gradlew :fabric:test :fabric:build
+./gradlew :fabric:setupFiles :fabric:test :fabric:build -PmodLoader=fabric -PminecraftVersion=1.20.4
 ```
 
-产物位于 `build/release/`。
+产物位于 `build/release/`，命名为 `YYMTR-<loader>-4.0.5+<minecraft-version>-performance12.jar`；服务端精简包会追加 `-server`。
 
 ### 优化提交索引
 
@@ -78,7 +80,7 @@ MTR 通过 Gradle composite build 引用 `path-computation`，只引入该独立
 
 ## English
 
-MTR-YanYang is a community fork of [Minecraft Transit Railway](https://github.com/Minecraft-Transit-Railway/Minecraft-Transit-Railway), based on MTR 4.0.5. The current optimization and validation target is **Minecraft 1.20.1 Fabric**.
+MTR-YanYang is a community fork of [Minecraft Transit Railway](https://github.com/Minecraft-Transit-Railway/Minecraft-Transit-Railway), based on MTR 4.0.5. The performance baseline is **Minecraft 1.20.1 Fabric**. **Fabric 1.20.4 has passed source builds and regression tests**, with in-game validation still pending. The 1.21.1 and 1.21.4 mapping ports are not complete.
 
 The fork focuses on dense stations, platforms, tracks and trains. MTR 4.0's underlying architecture comes from upstream; this fork adds:
 
@@ -94,7 +96,7 @@ Parallelization applies to path computation, not the entire vehicle simulation o
 
 ### Installation
 
-Download the Fabric 1.20.1 runtime jar from [Releases](https://github.com/Yanyang-Technology-Group/MTR-YanYang/releases), install Fabric Loader and Fabric API, place the jar in `mods`, and restart. Keep only one MTR runtime jar when replacing an existing installation. Do not install the sources jar. The latest repository commits may not yet be included in a published release.
+Download the matching Minecraft version's `YYMTR-fabric-4.0.5+<minecraft-version>-performance12.jar` from [Releases](https://github.com/Yanyang-Technology-Group/MTR-YanYang/releases), install Fabric Loader and Fabric API, place the jar in `mods`, and restart. Keep only one MTR runtime jar when replacing an existing installation. Do not install the sources jar. The latest repository commits may not yet be included in a published release.
 
 ### Server path computation options
 
@@ -108,9 +110,9 @@ The integration is disabled when at most two processors are available to the JVM
 
 ### Building
 
-Check out [Transport-Simulation-Core](https://github.com/Yanyang-Technology-Group/Transport-Simulation-Core) beside `Minecraft-Transit-Railway`, as shown in the directory layout above. The composite build imports only its standalone Java 17 `path-computation` module. Build tooling requires JDK 21, with a Java 17 toolchain for the Fabric 1.20.1 target, plus the project's existing MTR mapping and build dependencies.
+Check out [Transport-Simulation-Core](https://github.com/Yanyang-Technology-Group/Transport-Simulation-Core) beside `Minecraft-Transit-Railway`, as shown in the directory layout above. The composite build imports only its standalone Java 17 `path-computation` module. Install JDK 21 for build tooling and JDK 17 for Fabric 1.20.1/1.20.4, plus the project's existing MTR mapping and build dependencies. Minecraft 1.21.x requires Java 21, but this branch's mapping layer does not support it yet. See the [compatibility notes](docs/version-compatibility.md).
 
-Run `./gradlew :fabric:test :fabric:build` from the MTR repository. Release artifacts are written to `build/release/`. The commit index above links to the optimization history in both repositories.
+Run `./gradlew :fabric:setupFiles :fabric:test :fabric:build -PmodLoader=fabric -PminecraftVersion=1.20.4` from the MTR repository. Release artifacts are written to `build/release/` using the `YYMTR-<loader>-4.0.5+<minecraft-version>-performance12.jar` naming convention; server-only artifacts append `-server`. The commit index above links to the optimization history in both repositories.
 
 ### License and acknowledgements
 

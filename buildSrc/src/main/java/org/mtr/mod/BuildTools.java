@@ -61,8 +61,13 @@ public class BuildTools {
 		this.loader = loader;
 		path = project.getProjectDir().toPath();
 		version = project.getVersion().toString();
-		majorVersion = Integer.parseInt(minecraftVersion.split("\\.")[1]);
-		javaLanguageVersion = majorVersion <= 16 ? 8 : majorVersion == 17 ? 16 : 17;
+		final MinecraftVersion targetVersion = new MinecraftVersion(minecraftVersion);
+		majorVersion = targetVersion.minor;
+		javaLanguageVersion = targetVersion.javaLanguageVersion();
+		final Path mappingJar = project.getRootDir().toPath().resolve("libs/Minecraft-Mappings-" + loader + "-" + minecraftVersion + "-0.0.1-dev.jar");
+		if (!Files.isRegularFile(mappingJar)) {
+			throw new IllegalArgumentException("Missing version-specific Minecraft mappings: " + mappingJar + ". Port the mapping layer and its mixin generators before building this Minecraft version.");
+		}
 
 		final Path accessWidenerPath = path.resolve("src/main/resources").resolve(loader.equals("fabric") ? "" : "META-INF");
 		Files.createDirectories(accessWidenerPath);
@@ -219,7 +224,7 @@ public class BuildTools {
 	}
 
 	public void copyLootTables(String namespace) throws IOException {
-		final Path directory = path.resolve("src/main/resources/data").resolve(namespace).resolve("loot_tables/blocks");
+		final Path directory = path.resolve("src/main/resources/data").resolve(namespace).resolve(new MinecraftVersion(minecraftVersion).lootTableDirectory() + "/blocks");
 		Files.createDirectories(directory);
 		try (final Stream<Path> stream = Files.list(path.resolve("src/main/loot_table_templates").resolve(namespace))) {
 			stream.forEach(lootTablePath -> {
@@ -305,7 +310,7 @@ public class BuildTools {
 	public void copyBuildFile(boolean excludeAssets) throws IOException {
 		final Path directory = path.getParent().resolve("build/release");
 		Files.createDirectories(directory);
-		Files.copy(path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")), directory.resolve(String.format("MTR-%s-%s+%s%s.jar", loader, version, minecraftVersion, excludeAssets ? "-server" : "")), StandardCopyOption.REPLACE_EXISTING);
+		Files.copy(path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")), directory.resolve(String.format("YYMTR-%s-%s+%s-performance12%s.jar", loader, version, minecraftVersion, excludeAssets ? "-server" : "")), StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	public void getPatreonList(String key) throws IOException {
@@ -341,10 +346,14 @@ public class BuildTools {
 	}
 
 	private static JsonElement getJson(String url, String... requestProperties) {
+		Exception failure = null;
 		for (int i = 0; i < 5; i++) {
+			HttpURLConnection connection = null;
 			try {
-				final HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+				connection = (HttpURLConnection) new URL(url).openConnection();
 				connection.setUseCaches(false);
+				connection.setConnectTimeout(10000);
+				connection.setReadTimeout(10000);
 
 				for (int j = 0; j < requestProperties.length / 2; j++) {
 					connection.setRequestProperty(requestProperties[2 * j], requestProperties[2 * j + 1]);
@@ -352,20 +361,21 @@ public class BuildTools {
 
 				try (final InputStream inputStream = connection.getInputStream()) {
 					return JsonParser.parseString(IOUtils.toString(inputStream, StandardCharsets.UTF_8));
-				} catch (Exception e) {
-					LOGGER.error("", e);
 				}
 			} catch (Exception e) {
-				LOGGER.error("", e);
+				failure = e;
+			} finally {
+				if (connection != null) connection.disconnect();
 			}
 			try {
 				Thread.sleep(1000);
-			} catch (Exception e) {
-				LOGGER.error("", e);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Interrupted fetching build metadata from " + url, e);
 			}
 		}
 
-		return new JsonObject();
+		throw new IllegalStateException("Could not fetch build metadata from " + url, failure);
 	}
 
 	private static String getGemini(String key, String content, String systemInstruction) throws IOException {

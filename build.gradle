@@ -1,6 +1,6 @@
 plugins {
 	id "java"
-	id "com.github.johnrengelman.shadow" version "+" apply false
+	id "com.github.johnrengelman.shadow" version "8.1.1" apply false
 }
 
 group "org.mtr.mod"
@@ -20,6 +20,7 @@ subprojects {
 		shadowImplementation "org.mtr:Shadow-Libraries-util:0.0.1"
 		shadowImplementation "org.mtr:Minecraft-Mappings-common:0.0.1"
 		shadowImplementation "org.mtr:Transport-Simulation-Core:0.0.1"
+		shadowImplementation "org.mtr:tsc-path-computation:1.0.0"
 		shadowImplementation "com.logisticscraft:occlusionculling:+"
 		compileOnly "com.google.code.findbugs:jsr305:+"
 	}

@@ -34,7 +34,9 @@
 		"mtr.performance.mixins.json"
 	],
 	"depends": {
+		"fabricloader": ">=0.16.10",
 		"fabric": "*",
-		"minecraft": "@minecraft@"
+		"minecraft": "@minecraft@",
+		"java": ">=@java@"
 	}
 }

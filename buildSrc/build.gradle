@@ -11,6 +11,12 @@ dependencies {
 	implementation "org.mtr:Minecraft-Mod-API-Tools:0.0.1"
 	implementation "org.mtr:Minecraft-Mappings-common:0.0.1"
 	implementation "org.mtr:Transport-Simulation-Core:Build-Tools"
+	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.11.4"
+}
+
+test {
+	useJUnitPlatform()
 }
 
 repositories {
