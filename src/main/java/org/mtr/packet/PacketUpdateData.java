@@ -16,60 +16,63 @@ import org.mtr.registry.RegistryServer;
 
 public final class PacketUpdateData extends PacketRequestResponseBase {
 
-	public PacketUpdateData(PacketBufferReceiver packetBufferReceiver) {
-		super(packetBufferReceiver);
-	}
+        public PacketUpdateData(PacketBufferReceiver packetBufferReceiver) {
+                super(packetBufferReceiver);
+        }
 
-	public PacketUpdateData(UpdateDataRequest updateDataRequest) {
-		super(Utilities.getJsonObjectFromData(updateDataRequest).toString());
-	}
+        public PacketUpdateData(UpdateDataRequest updateDataRequest) {
+                super(Utilities.getJsonObjectFromData(updateDataRequest).toString());
+        }
 
-	private PacketUpdateData(String content) {
-		super(content);
-	}
+        private PacketUpdateData(String content) {
+                super(content);
+        }
 
-	@Override
-	protected void runClientInbound(JsonReader jsonReader) {
-		update(jsonReader);
-	}
+        @Override
+        protected void runClientInbound(JsonReader jsonReader) {
+                update(jsonReader);
+        }
 
-	@Override
-	protected PacketRequestResponseBase getInstance(String content) {
-		return new PacketUpdateData(content);
-	}
+        @Override
+        protected PacketRequestResponseBase getInstance(String content) {
+                return new PacketUpdateData(content);
+        }
 
-	@Override
-	protected SerializedDataBase getDataInstance(JsonReader jsonReader) {
-		return new UpdateDataRequest(jsonReader, new MinecraftClientData());
-	}
+        @Override
+        protected SerializedDataBase getDataInstance(JsonReader jsonReader) {
+                return new UpdateDataRequest(jsonReader, new MinecraftClientData());
+        }
 
-	@Override
-	protected String getKey() {
-		return OperationProcessor.UPDATE_DATA;
-	}
+        @Override
+        protected String getKey() {
+                return OperationProcessor.UPDATE_DATA;
+        }
 
-	@Override
-	protected ResponseType responseType() {
-		return ResponseType.ALL;
-	}
+        @Override
+        protected ResponseType responseType() {
+                return ResponseType.ALL;
+        }
 
-	public static void sendDirectlyToServerRail(ServerLevel serverWorld, Rail rail) {
-		new PacketUpdateData(new UpdateDataRequest(new MinecraftClientData()).addRail(rail)).runServerOutbound(serverWorld, null);
-	}
+        public static void sendDirectlyToServerRail(ServerLevel serverWorld, Rail rail) {
+                new PacketUpdateData(new UpdateDataRequest(new MinecraftClientData()).addRail(rail)).runServerOutbound(serverWorld, null);
+        }
 
-	public static void sendDirectlyToServerSignalModification(ServerLevel serverWorld, SignalModification signalModification) {
-		new PacketUpdateData(new UpdateDataRequest(new MinecraftClientData()).addSignalModification(signalModification)).runServerOutbound(serverWorld, null);
-	}
+        public static void sendDirectlyToServerSignalModification(ServerLevel serverWorld, SignalModification signalModification) {
+                new PacketUpdateData(new UpdateDataRequest(new MinecraftClientData()).addSignalModification(signalModification)).runServerOutbound(serverWorld, null);
+        }
 
-	public static void sendDirectlyToClientDepotUpdate(ServerLevel serverWorld, UpdateDataResponse updateDataResponse) {
-		serverWorld.players().forEach(serverPlayerEntityNew -> RegistryServer.sendPacketToClient(serverPlayerEntityNew, new PacketUpdateData(Utilities.getJsonObjectFromData(updateDataResponse).toString())));
-	}
+        public static void sendDirectlyToClientDepotUpdate(ServerLevel serverWorld, UpdateDataResponse updateDataResponse) {
+                serverWorld.players().forEach(serverPlayerEntityNew -> RegistryServer.sendPacketToClient(serverPlayerEntityNew, new PacketUpdateData(Utilities.getJsonObjectFromData(updateDataResponse).toString())));
+        }
 
-	private static void update(JsonReader jsonReader) {
-		final MinecraftClientData minecraftClientData = MinecraftClientData.getInstance();
-		new UpdateDataResponse(jsonReader, minecraftClientData).write();
-		new UpdateDataResponse(jsonReader, MinecraftClientData.getDashboardInstance()).write();
-		minecraftClientData.vehicles.forEach(vehicle -> PathData.writePathCache(vehicle.vehicleExtraData.immutablePath, new MinecraftClientData(), vehicle.getTransportMode()));
-		DynamicTextureCache.instance.refresh();
-	}
+        private static void update(JsonReader jsonReader) {
+                final MinecraftClientData minecraftClientData = MinecraftClientData.getInstance();
+                new UpdateDataResponse(jsonReader, minecraftClientData).write();
+                new UpdateDataResponse(jsonReader, MinecraftClientData.getDashboardInstance()).write();
+                // Resolve paths against the real (now updated) client data so segments map to actual
+                // rails; a fresh empty data instance would make every segment fall back to a
+                // synthesized rail and lose signal colours and speed limits.
+                minecraftClientData.vehicles.forEach(vehicle -> PathData.writePathCache(vehicle.vehicleExtraData.immutablePath, minecraftClientData, vehicle.getTransportMode()));
+                DynamicTextureCache.instance.refresh();
+        }
 }
