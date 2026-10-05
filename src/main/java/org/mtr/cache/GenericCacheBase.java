@@ -1,8 +1,5 @@
 package org.mtr.cache;
 
-import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectCollection;
-
 import java.util.Random;
 import java.util.function.Supplier;
 
@@ -13,63 +10,64 @@ import java.util.function.Supplier;
  */
 public abstract class GenericCacheBase<T, U, V> {
 
-	private long lastChecked;
-	private final V data;
-	private final int approximateTimeout;
-	private final boolean canExpireWhileFetching;
+        private static final Random RANDOM = new Random();
 
-	public GenericCacheBase(V mapInstance, int approximateTimeout, boolean canExpireWhileFetching) {
-		data = mapInstance;
-		this.approximateTimeout = approximateTimeout;
-		this.canExpireWhileFetching = canExpireWhileFetching;
-	}
+        private long lastChecked;
+        private final V data;
+        private final int approximateTimeout;
+        private final boolean canExpireWhileFetching;
 
-	public final T get(U key, Supplier<T> createInstance) {
-		final long currentTime = System.currentTimeMillis();
+        public GenericCacheBase(V mapInstance, int approximateTimeout, boolean canExpireWhileFetching) {
+                data = mapInstance;
+                this.approximateTimeout = approximateTimeout;
+                this.canExpireWhileFetching = canExpireWhileFetching;
+        }
 
-		// Every 100 ms, check if the cache has expired data and clear it
-		if (currentTime - lastChecked > 100) {
-			final ObjectArrayList<U> keysToRemove = new ObjectArrayList<>();
-			values(data).forEach(dataHolder -> {
-				if (dataHolder.timeout < currentTime) {
-					keysToRemove.add(key);
-				}
-			});
-			keysToRemove.forEach(keyToRemove -> remove(data, keyToRemove));
-			lastChecked = currentTime;
-		}
+        public final T get(U key, Supplier<T> createInstance) {
+                final long currentTime = System.currentTimeMillis();
 
-		// Get cached data
-		final DataHolder<T> dataHolder = get(data, key);
-		final long newTimeout = currentTime + approximateTimeout + new Random().nextInt(approximateTimeout / 2);
-		if (dataHolder == null) {
-			final T newData = createInstance.get();
-			put(data, key, new DataHolder<>(newTimeout, newData));
-			return newData;
-		} else {
-			if (!canExpireWhileFetching) {
-				dataHolder.timeout = newTimeout;
-			}
-			return dataHolder.data;
-		}
-	}
+                // Every 100 ms, check if the cache has expired data and clear it
+                if (currentTime - lastChecked > 100) {
+                        removeExpired(data, currentTime);
+                        lastChecked = currentTime;
+                }
 
-	protected abstract DataHolder<T> get(V map, U key);
+                // Get cached data
+                final DataHolder<T> dataHolder = get(data, key);
+                final long newTimeout = currentTime + approximateTimeout + RANDOM.nextInt(approximateTimeout / 2);
+                if (dataHolder == null) {
+                        final T newData = createInstance.get();
+                        put(data, key, new DataHolder<>(newTimeout, newData));
+                        return newData;
+                } else {
+                        if (!canExpireWhileFetching) {
+                                dataHolder.timeout = newTimeout;
+                        }
+                        return dataHolder.data;
+                }
+        }
 
-	protected abstract void put(V map, U key, DataHolder<T> newData);
+        protected abstract DataHolder<T> get(V map, U key);
 
-	protected abstract ObjectCollection<DataHolder<T>> values(V map);
+        protected abstract void put(V map, U key, DataHolder<T> newData);
 
-	protected abstract void remove(V map, U key);
+        /**
+         * Removes every entry whose timeout has passed. The previous implementation collected
+         * the key currently being queried instead of the expired entries' keys, so expired
+         * entries were never removed and freshly queried keys were dropped instead.
+         */
+        protected abstract void removeExpired(V map, long currentTime);
 
-	protected static class DataHolder<T> {
+        protected abstract void remove(V map, U key);
 
-		private long timeout;
-		private final T data;
+        protected static class DataHolder<T> {
 
-		private DataHolder(long timeout, T data) {
-			this.timeout = timeout;
-			this.data = data;
-		}
-	}
+                private long timeout;
+                private final T data;
+
+                private DataHolder(long timeout, T data) {
+                        this.timeout = timeout;
+                        this.data = data;
+                }
+        }
 }
