@@ -264,11 +264,13 @@ public final class BuildTools {
 
 	/**
 	 * Downloads the upstream {@code javagl/Obj} library source zip and extracts it into
-	 * {@code src/main/java/de/javagl/obj/}, applying two source patches:
+	 * {@code src/main/java/de/javagl/obj/}, applying three source patches:
 	 * <ul>
 	 *   <li>{@code DefaultObj.java} — records the active material group name per face.</li>
 	 *   <li>{@code ObjReader.java} — groups objects by name so that {@code g}/{@code o}
 	 *       directives with the same identifier are merged into one group.</li>
+	 *   <li>{@code DefaultMtl.java} — materials without an explicit {@code d} (dissolve)
+	 *       line default to 1.0 (fully opaque) per the MTL specification.</li>
 	 * </ul>
 	 * Errors are logged and suppressed so the build continues even when offline.
 	 */
@@ -293,6 +295,10 @@ public final class BuildTools {
 								"ObjFaceParser objFaceParser = new ObjFaceParser();", "String groupOrObject = \"\";",
 								"case \"g\":", "case \"o\": if (!groupOrObject.equals(identifier) && !groupOrObject.isEmpty()) break;",
 								"output.setActiveGroupNames(Arrays.asList(groupNames));", "groupOrObject = identifier;"
+							);
+							case "DefaultMtl.java" -> content.replace(
+								"    public Float getD()\r\n    {\r\n        return d;\r\n    }",
+								"    public Float getD()\r\n    {\r\n        // YanYang fix: MTL materials without an explicit \"d\" (dissolve) line must\r\n        // default to 1.0 (fully opaque) per the MTL specification, never treated\r\n        // as transparent.\r\n        return d == null ? 1.0f : d;\r\n    }"
 							);
 							default -> content;
 						};

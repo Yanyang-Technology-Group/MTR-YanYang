@@ -141,6 +141,17 @@ Notes for this environment/branch:
   without a sibling checkout. If that module evolves, sync the five files under
   `src/main/java/org/mtr/core/path/compute/`.
 
+## OBJ loader: missing `d` defaults to opaque (1.0)
+
+Materials in MTL files that omit the `d` (dissolve) line must be fully opaque
+per the MTL specification. The vendored `javagl/Obj` library returned `null`
+from `Mtl.getD()` for such materials, leaving the opacity interpretation to
+every caller. The build-time source patch pipeline (`BuildTools.setupObjLibrary`,
+which already patched `DefaultObj.java` and `ObjReader.java`) now applies a
+third patch to `DefaultMtl.java`: `getD()` returns `1.0f` when `d` was never
+specified, so a missing `d` can never be treated as transparent anywhere in
+the OBJ loading path. Explicit `d` / `Tr` values are handled exactly as before.
+
 ## UI: official 4.1.0-beta.2 framework + AI passenger entry
 
 The dashboard and all other GUI screens follow the **official 4.1.0-beta.2
