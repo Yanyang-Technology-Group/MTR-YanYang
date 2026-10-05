@@ -1,6 +1,5 @@
 package org.mtr.render;
 
-import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.RemotePlayer;
@@ -16,8 +15,22 @@ import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.tool.CullingHelper;
 import org.mtr.tool.Drawing;
 
-import java.util.UUID;
-
+/**
+ * Renders AI passengers that are not currently on a vehicle.
+ *
+ * <p>Rendering is split by the current leg type:</p>
+ * <ul>
+ *   <li><b>No legs</b> — the passenger is idle at their home or at a landmark; a deterministic
+ *       wander around the area is rendered.</li>
+ *   <li><b>Walking leg</b> ({@code routeId == 0}) — the passenger interpolates between the leg
+ *       start and end positions. The start falls back to the passenger's home when no start
+ *       platform is set (first leg); the end falls back to the destination landmark or home
+ *       when no end platform is set (last leg).</li>
+ *   <li><b>Vehicle leg</b> ({@code routeId != 0}) while not yet boarded — the passenger stands
+ *       at a deterministic position on the boarding platform, instead of visually walking the
+ *       whole inter-station leg.</li>
+ * </ul>
+ */
 public class RenderPassengers {
 
 	private static final int MIN_MOVE_TIME = 10 * Utilities.MILLIS_PER_SECOND;
@@ -25,6 +38,12 @@ public class RenderPassengers {
 
 	private static final float MIN_WALKING_SPEED = 1F / Utilities.MILLIS_PER_SECOND; // 1 m/s
 	private static final float MAX_WALKING_SPEED = 4F / Utilities.MILLIS_PER_SECOND; // 4 m/s
+
+	/**
+	 * Time (ms) an idle passenger takes to turn from their arrival heading to the heading of
+	 * the next wander segment, after arriving at a wander destination.
+	 */
+	private static final double TURNING_TIME = 1000;
 
 	private static final int RESOLUTION = 1000000;
 	private static final long GOLDEN_RATIO_FRACTION = 0x9E3779B97F4A7C15L;
@@ -49,7 +68,8 @@ public class RenderPassengers {
 					if (area != null) {
 						render(passenger, getIdlePosition(area, passengerId));
 					}
-				} else {
+				} else if (directions.getFirst().getRouteId() == 0) {
+					// Walking leg — interpolate between the leg start and end positions
 					final PassengerDirection direction = directions.getFirst();
 					final Platform platform1 = minecraftClientData.platformIdMap.get(direction.getStartPlatformId());
 					final Platform platform2 = minecraftClientData.platformIdMap.get(direction.getEndPlatformId());
@@ -64,29 +84,45 @@ public class RenderPassengers {
 
 					final PositionAndYaw positionAndYaw2;
 					if (platform2 == null) {
-						final Landmark landmark = minecraftClientData.landmarkIdMap.get(passenger.getEndLandmarkId());
-						positionAndYaw2 = landmark == null ? null : getIdlePosition(landmark, passengerId);
+						if (passenger.getEndLandmarkId() == 0) {
+							// Final walking leg home — fall back to the passenger's home
+							final Home home = minecraftClientData.homeIdMap.get(passenger.getHomeId());
+							positionAndYaw2 = home == null ? null : getIdlePosition(home, passengerId);
+						} else {
+							final Landmark landmark = minecraftClientData.landmarkIdMap.get(passenger.getEndLandmarkId());
+							positionAndYaw2 = landmark == null ? null : getIdlePosition(landmark, passengerId);
+						}
 					} else {
 						positionAndYaw2 = getIdlePosition(platform2, passengerId);
 					}
 
 					if (positionAndYaw1 != null && positionAndYaw2 != null) {
-						final double progress = System.currentTimeMillis() - direction.getStartTime();
+						// Clamp to zero so a client clock behind the server doesn't extrapolate the
+						// passenger behind the leg start position.
+						final double progress = Math.max(0, System.currentTimeMillis() - direction.getStartTime());
 
 						final double differenceX = positionAndYaw2.x - positionAndYaw1.x;
 						final double differenceY = positionAndYaw2.y - positionAndYaw1.y;
 						final double differenceZ = positionAndYaw2.z - positionAndYaw1.z;
 						final double distance = Math.sqrt(differenceX * differenceX + differenceY * differenceY + differenceZ * differenceZ);
 
-						final double walkingSpeed = Math.max(getRandomValue(passengerId, MIN_WALKING_SPEED, MAX_WALKING_SPEED), distance / (direction.getEndTime() - direction.getStartTime()));
+						final long duration = direction.getEndTime() - direction.getStartTime();
+						final double requiredSpeed = duration <= 0 ? distance == 0 ? 0 : Double.POSITIVE_INFINITY : distance / duration;
+						final double walkingSpeed = Math.max(getRandomValue(passengerId, MIN_WALKING_SPEED, MAX_WALKING_SPEED), requiredSpeed);
 						final double walkingTime = distance / walkingSpeed;
-						final double walkingTimeChange = walkingTime == 0 ? 1 : Math.min(1, progress / walkingTime);
+						final double walkingTimeChange = walkingTime <= 0 ? 1 : Math.min(1, progress / walkingTime);
 						final double x = positionAndYaw1.x + walkingTimeChange * differenceX;
 						final double y = positionAndYaw1.y + walkingTimeChange * differenceY;
 						final double z = positionAndYaw1.z + walkingTimeChange * differenceZ;
 						final double yaw = Math.atan2(differenceZ, differenceX);
 
 						render(passenger, new PositionAndYaw(x, y, z, yaw));
+					}
+				} else {
+					// Vehicle leg while not yet boarded — stand at the boarding platform
+					final Platform platform1 = minecraftClientData.platformIdMap.get(directions.getFirst().getStartPlatformId());
+					if (platform1 != null) {
+						render(passenger, getIdlePosition(platform1, passengerId));
 					}
 				}
 			});
@@ -126,7 +162,10 @@ public class RenderPassengers {
 
 			final double yaw1 = Math.atan2(differenceZ, differenceX);
 			final double yaw2 = Math.atan2(z3 - z2, x3 - x2);
-			final double yaw = yaw1 + Utilities.clampSafe(progress - walkingTime, 0, 1000) * Utilities.circularDifference(yaw2, yaw1, Math.PI * 2);
+			// Interpolate the heading from the arrival heading to the next segment heading over
+			// TURNING_TIME milliseconds after arriving; the factor is normalised to 0-1.
+			final double turnProgress = Utilities.clampSafe((progress - walkingTime) / TURNING_TIME, 0, 1);
+			final double yaw = yaw1 + turnProgress * Utilities.circularDifference(yaw2, yaw1, Math.PI * 2);
 
 			for (long y = area.getMinY(); y <= area.getMaxY(); y++) {
 				final BlockPos checkPos1 = BlockPos.containing(x, y - 1, z);
@@ -176,7 +215,7 @@ public class RenderPassengers {
 				matrixStack.pushPose();
 				matrixStack.translate(positionAndYaw.x - offset.x, positionAndYaw.y - offset.y, positionAndYaw.z - offset.z);
 				Drawing.rotateYRadians(matrixStack, (float) (Math.PI / 2 - positionAndYaw.yaw));
-				final RemotePlayer remotePlayer = new RemotePlayer(clientWorld, new GameProfile(new UUID(passenger.getId(), 0), passenger.getName()));
+				final RemotePlayer remotePlayer = PassengerRenderCache.getEntity(clientWorld, passenger);
 				final BlockPos blockPos = BlockPos.containing(positionAndYaw.x, positionAndYaw.y, positionAndYaw.z);
 				final int light = LightTexture.pack(clientWorld.getBrightness(LightLayer.BLOCK, blockPos), clientWorld.getBrightness(LightLayer.SKY, blockPos));
 //? if >= 1.21.4 {
