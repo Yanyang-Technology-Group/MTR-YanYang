@@ -326,7 +326,7 @@ public final class RenderVehicles {
                                                                         });
                                                                         if (vehiclePosition != null) {
                                                                                 final RemotePlayer remotePlayer = PassengerRenderCache.getEntity(clientWorld, passenger);
-                                                                                renderPlayer(remotePlayer, -1, gangwayConnectionFloor1.minZ, gangwayConnectionFloor2.maxZ, new Vec3(vehiclePosition.x, vehiclePosition.y, vehiclePosition.z), vehiclePosition.yawOffset + absoluteVehicleCarPositionAndRotation.yaw, oscillationAmount, offsetVector, offsetRotation, absoluteVehicleCarPositionAndRotation, ridingCarPositionAndRotation, cameraShakeOffset);
+                                                                                renderPlayer(remotePlayer, -1, gangwayConnectionFloor1.minZ, gangwayConnectionFloor2.maxZ, new Vec3(vehiclePosition.x(), vehiclePosition.y(), vehiclePosition.z()), vehiclePosition.yawOffset() + absoluteVehicleCarPositionAndRotation.yaw, oscillationAmount, offsetVector, offsetRotation, absoluteVehicleCarPositionAndRotation, ridingCarPositionAndRotation, cameraShakeOffset);
                                                                         }
                                                                 }
                                                         });

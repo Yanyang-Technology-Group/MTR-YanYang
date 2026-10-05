@@ -1,6 +1,6 @@
 package org.mtr.render;
 
-import net.minecraft.client.culling.Frustum;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;

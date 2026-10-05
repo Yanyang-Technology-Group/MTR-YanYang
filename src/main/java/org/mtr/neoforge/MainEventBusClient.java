@@ -82,7 +82,7 @@ public final class MainEventBusClient {
                         if (worldRenderCallback != null) {
                                 // Capture the frustum for block entity culling; vanilla renders block entities
                                 // after this event, and the frame is cleared again at the end of level rendering.
-                                BlockEntityRenderCulling.begin(event.getLevel(), event.getFrustum());
+                                BlockEntityRenderCulling.begin(Minecraft.getInstance().level, event.getFrustum());
                                 worldRenderCallback.accept(event.getPoseStack(), Minecraft.getInstance().renderBuffers().bufferSource(), event.getCamera().getPosition());
                         }
                 } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL && worldRenderEndRunnable != null) {

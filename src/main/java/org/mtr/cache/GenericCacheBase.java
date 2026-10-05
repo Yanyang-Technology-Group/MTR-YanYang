@@ -62,7 +62,7 @@ public abstract class GenericCacheBase<T, U, V> {
 
         protected static class DataHolder<T> {
 
-                private long timeout;
+                long timeout;
                 private final T data;
 
                 private DataHolder(long timeout, T data) {

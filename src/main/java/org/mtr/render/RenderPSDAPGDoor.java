@@ -51,6 +51,15 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
                 this.type = type;
         }
 
+        private static final ResourceLocation[] TEXTURE_LIGHT = new ResourceLocation[2];
+        private static final ResourceLocation[] TEXTURE_APG_LIGHT = new ResourceLocation[2];
+        private static final ResourceLocation[][] TEXTURE_APG_DOOR = new ResourceLocation[2][2];
+        private static final ResourceLocation[][] TEXTURE_LIFT_DOOR = new ResourceLocation[2][2];
+        private static final ResourceLocation[][][] TEXTURE_PSD_DOOR = new ResourceLocation[2][2][2];
+        private static final ResourceLocation[][][] TEXTURE_PSD_END_1 = new ResourceLocation[2][2][2];
+        private static final ResourceLocation[][][] TEXTURE_PSD_END_2 = new ResourceLocation[2][2][2];
+        private static final ResourceLocation TEXTURE_DOOR_NOT_IN_USE = ResourceLocation.fromNamespaceAndPath(MTR.MOD_ID, "textures/block/sign/door_not_in_use.png");
+
         static {
                 // Pre-resolve every door texture; these used to be re-formatted and re-parsed up to
                 // four times per door per frame.
@@ -68,15 +77,6 @@ public class RenderPSDAPGDoor<T extends BlockPSDAPGDoorBase.BlockEntityBase> ext
                         }
                 }
         }
-
-        private static final ResourceLocation[] TEXTURE_LIGHT = new ResourceLocation[2];
-        private static final ResourceLocation[] TEXTURE_APG_LIGHT = new ResourceLocation[2];
-        private static final ResourceLocation[][] TEXTURE_APG_DOOR = new ResourceLocation[2][2];
-        private static final ResourceLocation[][] TEXTURE_LIFT_DOOR = new ResourceLocation[2][2];
-        private static final ResourceLocation[][][] TEXTURE_PSD_DOOR = new ResourceLocation[2][2][2];
-        private static final ResourceLocation[][][] TEXTURE_PSD_END_1 = new ResourceLocation[2][2][2];
-        private static final ResourceLocation[][][] TEXTURE_PSD_END_2 = new ResourceLocation[2][2][2];
-        private static final ResourceLocation TEXTURE_DOOR_NOT_IN_USE = ResourceLocation.fromNamespaceAndPath(MTR.MOD_ID, "textures/block/sign/door_not_in_use.png");
 
         @Override
         public void render(T blockEntity, PoseStack matrixStack2, MultiBufferSource vertexConsumerProvider, ClientLevel world, LocalPlayer player, float tickDelta, int light, int overlay) {

@@ -225,7 +225,7 @@ public final class WorkerThread {
 
                 private final Minecraft minecraftClient = Minecraft.getInstance();
                 /** Reused across queries — a fresh block position used to be allocated per voxel. */
-                private final BlockPos.MutablePos blockPos = new BlockPos.MutablePos();
+                private final BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos();
                 @Nullable
                 private ClientLevel clientWorld = null;
 

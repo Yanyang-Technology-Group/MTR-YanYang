@@ -26,7 +26,7 @@ public final class RouteMapSpanCache {
 
 	private final Long2IntOpenHashMap[] distances = new Long2IntOpenHashMap[6];
 	private final LongArrayList path = new LongArrayList();
-	private final BlockPos.MutablePos cursor = new BlockPos.MutablePos();
+	private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
 	// Kind bits: 1 = matching block, 2 = this end, 4 = opposite end.
 
