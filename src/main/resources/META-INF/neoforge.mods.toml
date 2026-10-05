@@ -26,3 +26,6 @@ versionRange = "${minecraft_version}"
 
 [[mixins]]
 config = "mtr.mixins.json"
+
+[[mixins]]
+config = "mtr.performance.mixins.json"

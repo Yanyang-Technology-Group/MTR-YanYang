@@ -27,7 +27,8 @@
 		]
 	},
 	"mixins": [
-		"mtr.mixins.json"
+		"mtr.mixins.json",
+		"mtr.performance.mixins.json"
 	],
 	"depends": {
 		"minecraft": "${minecraft_version}",
