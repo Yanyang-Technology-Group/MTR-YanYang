@@ -140,3 +140,31 @@ Notes for this environment/branch:
   Transport-Simulation-Core fork's `path-computation` module so this repository builds
   without a sibling checkout. If that module evolves, sync the five files under
   `src/main/java/org/mtr/core/path/compute/`.
+
+## UI restoration (legacy dashboard style + AI passenger entry)
+
+The 4.1.0-beta.2 upstream redesign replaced the entire GUI framework (the old
+`org.mtr.mod.screen` mapping-based screens no longer compile against this tree), so
+a full old-framework backport is out of scope. What **is** restored on the new
+Elementa-based framework, matching the YanYang 4.0.5 dashboard layout:
+
+- **Full-height map** — the map now fills the entire right side of the dashboard
+  (YanYang 4.0.5 `widgetMap.setPositionAndSize(PANEL_WIDTH, 0, ..., height)`), with
+  the two bottom button rows overlaying it, instead of being squeezed below a top
+  button row.
+- **Legacy bottom button rows** — `Transport System Map | Rail Actions | + | -` on
+  the upper row, `Resource Pack Creator | Options` on the lower row (the corner
+  previously held the top-view / current-Y map toggles; the new map renderer always
+  follows the player's Y level, so those toggles are obsolete).
+- **Restored Rail Actions screen** — upstream dropped the screen during the GUI
+  redesign even though `PacketBroadcastRailActions` still populates
+  `MinecraftClientData.railActions` and `PacketDeleteRailAction` remains registered.
+  The new `RailActionsScreen` lists pending rail actions and undoes them one by one,
+  like the pre-4.1 screen.
+- **AI passenger entry un-hidden** — upstream commit `9d7a5ddf` ("Temporarily hide
+  homes and landmarks tabs") set the Homes/Landmarks tab buttons to zero width,
+  which also removed the only entry point for the resident simulation that drives
+  AI passengers. All five tab buttons are back at `PANEL_WIDTH / 5` each. Create
+  Homes (residences) and Landmarks (destinations) and the simulation spawns
+  passengers automatically — these are the AI passengers rendered with the YanYang
+  walking animation, phone pose and skin features.
