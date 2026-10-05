@@ -1,6 +1,14 @@
-# Minecraft Transit Railway 4.0.0
+# Minecraft Transit Railway 4.1.0 — YanYang Optimised (1.21.1 branch)
 
 _Minecraft Transit Railway_ is a [Minecraft mod](https://minecraft.wiki/w/Mods) that lets you build your own transport network with automated trains, boats, cable cars, and planes.
+
+> **YanYang Technology Group optimised branch.** This branch (`1.21.1`) is based on the
+> upstream `stonecutter` codebase (4.1.0-beta.2, Minecraft 1.21.1 / 1.21.4) and carries
+> the YanYang performance work forward from the 4.0.5 optimised releases, plus AI
+> passenger fixes and further bug fixes found during the port. It is a branch of the
+> upstream mod and contains optimised content — see
+> [docs/YANYANG_PORT.md](docs/YANYANG_PORT.md) for the full porting notes (what was
+> ported, what was deliberately not ported yet, and why).
 
 Version 4.0.0 is a complete rewrite from scratch.
 The vehicle simulation code is separated from the Minecraft instance, which greatly reduces lag on Minecraft servers.
