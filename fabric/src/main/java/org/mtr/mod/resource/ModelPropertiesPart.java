@@ -185,7 +185,14 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		names.forEach(name -> {
 			final OptimizedModel.ObjModel objModel = nameToObjModels.get(name);
 			if (objModel != null) {
-				objModels.add(new OptimizedModelWrapper.ObjModelWrapper(objModel));
+				// YanYang fix: each part must own an isolated copy of the model. addTransformation
+				// appends transformed mesh copies to the shared rawModel of the ObjModel instance,
+				// so reusing one instance across multiple parts (for example a seat group with
+				// ON_ROUTE_FORWARDS / ON_ROUTE_BACKWARDS / AT_DEPOT variants) accumulates every
+				// variant's transformations together and all of them render at once, regardless
+				// of the part condition — forward and flipped seats overlapping. A per-part copy
+				// keeps the accumulation local to this part's own condition bucket.
+				objModels.add(new OptimizedModelWrapper.ObjModelWrapper(objModel.copy()));
 				mutableBox.add(new Box(-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(), -objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ()));
 			}
 		});
