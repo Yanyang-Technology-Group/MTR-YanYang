@@ -92,6 +92,9 @@ public final class MTRClient {
                 MTR.writeFromClient();
                 KeyBindings.init();
 
+                // Passenger skin pool (vanilla defaults + optional online skins via config)
+                PassengerSkinManager.init();
+
                 RegistryClient.registerBlockRenderType(RenderType.cutout(), Blocks.APG_DOOR);
                 RegistryClient.registerBlockRenderType(RenderType.cutout(), Blocks.APG_GLASS);
                 RegistryClient.registerBlockRenderType(RenderType.cutout(), Blocks.APG_GLASS_END);
@@ -378,6 +381,7 @@ public final class MTRClient {
                 EventRegistryClient.registerResourceReloadEvent(() -> {
                         CustomResourceLoader.reload();
                         ReleasedDynamicTextureRegistry.INSTANCE.reload();
+                        PassengerSkinManager.reload();
                 });
                 EventRegistryClient.registerWorldRenderEvent(MainRenderer::render);
                 EventRegistryClient.registerWorldRenderEndEvent(BlockEntityRenderCulling::end);

@@ -28,10 +28,12 @@ import org.mtr.font.FontRenderHelper;
 import org.mtr.font.FontRenderOptions;
 import org.mtr.item.ItemLiftRefresher;
 import org.mtr.libraries.it.unimi.dsi.fastutil.ints.IntObjectImmutablePair;
+import org.mtr.libraries.it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectBooleanImmutablePair;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
+import org.mtr.model.ModelLift1;
 import org.mtr.registry.Items;
 import org.mtr.resource.LiftResource;
 import org.mtr.tool.Drawing;
@@ -175,14 +177,16 @@ public class RenderLifts implements IGui {
 
                                 // Render the lift
                                 final StoredMatrixTransformations storedMatrixTransformations = RenderVehicles.getStoredMatrixTransformations(offsetVector == null, renderingPositionAndRotation, 0);
-//                              new ModelLift1((int) Math.round(lift.getHeight() * 2), (int) Math.round(lift.getWidth()), (int) Math.round(lift.getDepth()), lift.getIsDoubleSided()).render(
-//                                              storedMatrixTransformations,
-//                                              null,
-//                                              getLiftResource(lift.getStyle()).getTexture(),
-//                                              absolutePositionAndRotation.light,
-//                                              doorway1Open ? lift.getDoorValue() / LIFT_DOOR_VALUE : 0, doorway2Open ? lift.getDoorValue() / LIFT_DOOR_VALUE : 0, false,
-//                                              0, 1, true, true, false, true, false
-//                              );
+                                // Render the lift car model, ported from the YanYang 4.0.5 ModelLift1.
+                                // The model is parameterised by the lift dimensions, so it is cached per lift id
+                                // and rebuilt only when the customisation changes.
+                                getLiftModel(lift).render(
+                                                storedMatrixTransformations,
+                                                getLiftResource(lift.getStyle()).getTexture(),
+                                                absolutePositionAndRotation.light,
+                                                doorway1Open ? lift.getDoorValue() / LIFT_DOOR_VALUE : 0,
+                                                doorway2Open ? lift.getDoorValue() / LIFT_DOOR_VALUE : 0
+                                );
 
                                 // Render the display inside the lift
                                 for (int i = 0; i < (lift.getIsDoubleSided() ? 2 : 1); i++) {
@@ -277,6 +281,36 @@ public class RenderLifts implements IGui {
                 }
 
                 return liftResource == null ? CustomResourceLoader.getLifts().getFirst() : liftResource;
+        }
+
+        /**
+         * Cache of parameterised lift car models, keyed by lift id. The YanYang ModelLift1 build
+         * allocates the full block/cube list for the floor plan, so it must not run per frame;
+         * entries are rebuilt only when the lift dimensions change.
+         */
+        private static final Long2ObjectLinkedOpenHashMap<LiftModelCacheEntry> LIFT_MODEL_CACHE = new Long2ObjectLinkedOpenHashMap<>();
+        private static final int LIFT_MODEL_CACHE_LIMIT = 256;
+
+        private static ModelLift1 getLiftModel(Lift lift) {
+                final int height = (int) Math.round(lift.getHeight() * 2);
+                final int width = (int) Math.round(lift.getWidth());
+                final int depth = (int) Math.round(lift.getDepth());
+                final boolean doubleSided = lift.getIsDoubleSided();
+
+                final LiftModelCacheEntry cached = LIFT_MODEL_CACHE.getAndMoveToFirst(lift.getId());
+                if (cached != null && cached.height == height && cached.width == width && cached.depth == depth && cached.doubleSided == doubleSided) {
+                        return cached.model;
+                }
+
+                final ModelLift1 model = new ModelLift1(height, width, depth, doubleSided);
+                LIFT_MODEL_CACHE.putAndMoveToFirst(lift.getId(), new LiftModelCacheEntry(model, height, width, depth, doubleSided));
+                while (LIFT_MODEL_CACHE.size() > LIFT_MODEL_CACHE_LIMIT) {
+                        LIFT_MODEL_CACHE.removeLast();
+                }
+                return model;
+        }
+
+        private record LiftModelCacheEntry(ModelLift1 model, int height, int width, int depth, boolean doubleSided) {
         }
 
         private static PositionAndRotation getLiftPositionAndRotation(ClientLevel clientWorld, Lift lift) {

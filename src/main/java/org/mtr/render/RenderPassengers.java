@@ -2,7 +2,6 @@ package org.mtr.render;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LightLayer;
@@ -30,6 +29,10 @@ import org.mtr.tool.Drawing;
  *       at a deterministic position on the boarding platform, instead of visually walking the
  *       whole inter-station leg.</li>
  * </ul>
+ *
+ * <p>Each rendered position also carries the current walking speed in blocks per second, which
+ * drives the leg swing animation in {@link PassengerModelRenderer}; standing passengers (speed
+ * 0) can take the phone pose.</p>
  */
 public class RenderPassengers {
 
@@ -116,7 +119,10 @@ public class RenderPassengers {
 						final double z = positionAndYaw1.z + walkingTimeChange * differenceZ;
 						final double yaw = Math.atan2(differenceZ, differenceX);
 
-						render(passenger, new PositionAndYaw(x, y, z, yaw));
+						// Animation speed: the leg swing cycle runs while the walk is still in
+						// progress; once arrived (waiting for the leg time to elapse) they stand.
+						final double walkingSpeedBlocksPerSecond = walkingTimeChange < 1 ? walkingSpeed * Utilities.MILLIS_PER_SECOND : 0;
+						render(passenger, new PositionAndYaw(x, y, z, yaw, walkingSpeedBlocksPerSecond));
 					}
 				} else {
 					// Vehicle leg while not yet boarded — stand at the boarding platform
@@ -133,7 +139,7 @@ public class RenderPassengers {
 		final ClientLevel clientWorld = Minecraft.getInstance().level;
 
 		if (clientWorld == null) {
-			return new PositionAndYaw(0, 0, 0, 0);
+			return new PositionAndYaw(0, 0, 0, 0, 0);
 		} else {
 			final double walkingSpeed = getRandomValue(passengerId, MIN_WALKING_SPEED, MAX_WALKING_SPEED) / 2; // half walking speed when idling
 			final double longestWalkingTime = (Math.abs(area.getMaxX() - area.getMinX()) + Math.abs(area.getMaxZ() - area.getMinZ())) / walkingSpeed;
@@ -167,17 +173,19 @@ public class RenderPassengers {
 			final double turnProgress = Utilities.clampSafe((progress - walkingTime) / TURNING_TIME, 0, 1);
 			final double yaw = yaw1 + turnProgress * Utilities.circularDifference(yaw2, yaw1, Math.PI * 2);
 
+			final double animationSpeed = getWanderAnimationSpeed(walkingTime, progress, walkingSpeed);
+
 			for (long y = area.getMinY(); y <= area.getMaxY(); y++) {
 				final BlockPos checkPos1 = BlockPos.containing(x, y - 1, z);
 				final BlockPos checkPos2 = BlockPos.containing(x, y, z);
 				final BlockPos checkPos3 = BlockPos.containing(x, y + 1, z);
 
 				if (!clientWorld.getBlockState(checkPos1).isAir() && clientWorld.getBlockState(checkPos2).isAir() && clientWorld.getBlockState(checkPos3).isAir()) {
-					return new PositionAndYaw(x, y, z, yaw);
+					return new PositionAndYaw(x, y, z, yaw, animationSpeed);
 				}
 			}
 
-			return new PositionAndYaw(x, clientWorld.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z)), z, yaw);
+			return new PositionAndYaw(x, clientWorld.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z)), z, yaw, animationSpeed);
 		}
 	}
 
@@ -185,18 +193,33 @@ public class RenderPassengers {
 		final ClientLevel clientWorld = Minecraft.getInstance().level;
 
 		if (clientWorld == null) {
-			return new PositionAndYaw(0, 0, 0, 0);
+			return new PositionAndYaw(0, 0, 0, 0, 0);
 		} else {
 			final Rail rail = platform.rail;
 
 			if (rail == null) {
-				return new PositionAndYaw(0, 0, 0, 0);
+				return new PositionAndYaw(0, 0, 0, 0, 0);
 			} else {
+				// Standing on the platform waiting for a train — no walk cycle (standing
+				// passengers are eligible for the phone pose).
 				// TODO use platform block positions
 				final Vector position = rail.railMath.getPosition(getRandomValue(passengerId, 0, rail.railMath.getLength()), false);
-				return new PositionAndYaw(position.x(), position.y(), position.z(), 0);
+				return new PositionAndYaw(position.x(), position.y(), position.z(), 0, 0);
 			}
 		}
+	}
+
+	/**
+	 * Animation speed for the idle wander: walking (at half speed) while the wander walk is
+	 * still in progress, standing while turning or waiting for the next wander segment.
+	 *
+	 * @param walkingTime  total duration of this wander walk in milliseconds
+	 * @param progress     elapsed time within the wander segment in milliseconds
+	 * @param walkingSpeed the wander walking speed in blocks per millisecond
+	 * @return the current walking speed in blocks per second, or 0 when standing
+	 */
+	private static double getWanderAnimationSpeed(double walkingTime, long progress, double walkingSpeed) {
+		return walkingTime > 0 && progress < walkingTime ? walkingSpeed * Utilities.MILLIS_PER_SECOND : 0;
 	}
 
 	/**
@@ -215,20 +238,17 @@ public class RenderPassengers {
 				matrixStack.pushPose();
 				matrixStack.translate(positionAndYaw.x - offset.x, positionAndYaw.y - offset.y, positionAndYaw.z - offset.z);
 				Drawing.rotateYRadians(matrixStack, (float) (Math.PI / 2 - positionAndYaw.yaw));
-				final RemotePlayer remotePlayer = PassengerRenderCache.getEntity(clientWorld, passenger);
 				final BlockPos blockPos = BlockPos.containing(positionAndYaw.x, positionAndYaw.y, positionAndYaw.z);
 				final int light = LightTexture.pack(clientWorld.getBrightness(LightLayer.BLOCK, blockPos), clientWorld.getBrightness(LightLayer.SKY, blockPos));
-//? if >= 1.21.4 {
-				minecraftClient.getEntityRenderDispatcher().render(remotePlayer, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), light);
-//? } else {
-				/*minecraftClient.getEntityRenderDispatcher().render(remotePlayer, 0, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), light);
-//
-*///? }
+				// Rendered directly through the model renderer (walk cycle, idle head movement,
+				// phone pose, skin) instead of the entity render dispatcher. The expected matrix
+				// state on entry is identical to what the dispatcher call expected.
+				PassengerModelRenderer.renderPassenger(clientWorld, passenger, positionAndYaw.speed, matrixStack, minecraftClient.renderBuffers().bufferSource(), light);
 				matrixStack.popPose();
 			});
 		}
 	}
 
-	private record PositionAndYaw(double x, double y, double z, double yaw) {
+	private record PositionAndYaw(double x, double y, double z, double yaw, double speed) {
 	}
 }

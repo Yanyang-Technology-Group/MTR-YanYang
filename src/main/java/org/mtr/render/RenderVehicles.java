@@ -326,7 +326,9 @@ public final class RenderVehicles {
                                                                         });
                                                                         if (vehiclePosition != null) {
                                                                                 final RemotePlayer remotePlayer = PassengerRenderCache.getEntity(clientWorld, passenger);
-                                                                                renderPlayer(remotePlayer, -1, gangwayConnectionFloor1.minZ, gangwayConnectionFloor2.maxZ, new Vec3(vehiclePosition.x(), vehiclePosition.y(), vehiclePosition.z()), vehiclePosition.yawOffset() + absoluteVehicleCarPositionAndRotation.yaw, oscillationAmount, offsetVector, offsetRotation, absoluteVehicleCarPositionAndRotation, ridingCarPositionAndRotation, cameraShakeOffset);
+                                                                                // Standing on the vehicle — rendered through the model renderer (idle head
+                                                                                // movement, phone pose for a deterministic subset, skin), no walk cycle.
+                                                                                renderPlayer(remotePlayer, passenger, -1, gangwayConnectionFloor1.minZ, gangwayConnectionFloor2.maxZ, new Vec3(vehiclePosition.x(), vehiclePosition.y(), vehiclePosition.z()), vehiclePosition.yawOffset() + absoluteVehicleCarPositionAndRotation.yaw, oscillationAmount, offsetVector, offsetRotation, absoluteVehicleCarPositionAndRotation, ridingCarPositionAndRotation, cameraShakeOffset);
                                                                         }
                                                                 }
                                                         });
@@ -431,6 +433,16 @@ public final class RenderVehicles {
          * @param cameraShakeOffset            additional camera shake
          */
         public static void renderPlayer(Player playerEntity, int ridingCar, double minZ, double maxZ, Vec3 playerOffsetVector, double additionalRotation, double oscillationAmount, @Nullable Vec3 offsetVector, @Nullable Double offsetRotation, PositionAndRotation playerCarPositionAndRotation, @Nullable PositionAndRotation ridingCarPositionAndRotation, Vec3 cameraShakeOffset) {
+                renderPlayer(playerEntity, null, ridingCar, minZ, maxZ, playerOffsetVector, additionalRotation, oscillationAmount, offsetVector, offsetRotation, playerCarPositionAndRotation, ridingCarPositionAndRotation, cameraShakeOffset);
+        }
+
+        /**
+         * Renders a player or AI passenger standing inside a vehicle. Real players go through the
+         * entity render dispatcher as before; AI passengers ({@code aiPassenger != null}) are
+         * rendered through {@link PassengerModelRenderer} with the standing animation set (idle
+         * head movement, phone pose for a deterministic subset, skin), with no walk cycle.
+         */
+        public static void renderPlayer(Player playerEntity, @Nullable Passenger aiPassenger, int ridingCar, double minZ, double maxZ, Vec3 playerOffsetVector, double additionalRotation, double oscillationAmount, @Nullable Vec3 offsetVector, @Nullable Double offsetRotation, PositionAndRotation playerCarPositionAndRotation, @Nullable PositionAndRotation ridingCarPositionAndRotation, Vec3 cameraShakeOffset) {
                 Vector interpolatedPosition = null;
 
                 for (final RidingPlayerInterpolation ridingPlayerInterpolation : RIDING_PLAYER_INTERPOLATIONS) {
@@ -491,12 +503,18 @@ public final class RenderVehicles {
                                 storedMatrixTransformations.transform(matrixStack, offset);
                                 Drawing.rotateXDegrees(matrixStack, 180);
                                 Drawing.rotateYRadians(matrixStack, (float) (Math.PI + additionalRotation));
+                                if (aiPassenger == null) {
 //? if >= 1.21.4 {
-                                minecraftClient.getEntityRenderDispatcher().render(playerEntity, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), IGui.DEFAULT_LIGHT);
+                                        minecraftClient.getEntityRenderDispatcher().render(playerEntity, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), IGui.DEFAULT_LIGHT);
 //? } else {
-                                /*minecraftClient.getEntityRenderDispatcher().render(playerEntity, 0, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), IGui.DEFAULT_LIGHT);
+                                        /*minecraftClient.getEntityRenderDispatcher().render(playerEntity, 0, 0, 0, 0, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), IGui.DEFAULT_LIGHT);
 //
 *///? }
+                                } else {
+                                        // AI standee: same expected matrix state, rendered through the model
+                                        // renderer with the phone-possible standing pose.
+                                        PassengerModelRenderer.renderPassenger(minecraftClient.level, aiPassenger, 0, matrixStack, minecraftClient.renderBuffers().bufferSource(), IGui.DEFAULT_LIGHT);
+                                }
                                 matrixStack.popPose();
                         });
                 }
