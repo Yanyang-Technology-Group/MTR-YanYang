@@ -380,6 +380,7 @@ public final class MTRClient {
                         ReleasedDynamicTextureRegistry.INSTANCE.reload();
                 });
                 EventRegistryClient.registerWorldRenderEvent(MainRenderer::render);
+                EventRegistryClient.registerWorldRenderEndEvent(BlockEntityRenderCulling::end);
                 EventRegistryClient.registerHudLayerRenderEvent(context -> DrivingGuiRenderer.render(context));
 
                 Config.init(Minecraft.getInstance().gameDirectory.toPath());
