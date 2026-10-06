@@ -57,7 +57,9 @@ MTR/
 
 MTR 通过 Gradle composite build 引用 `path-computation`，只引入该独立 Java 17 计算模块。构建工具需要 JDK 21；Fabric 1.20.1 和 1.20.4 使用 Java 17 工具链，请同时安装两个 JDK。Minecraft 1.21.x 要求 Java 21，但本分支尚不支持其映射层。还需满足项目现有 MTR 映射库及构建依赖。
 
-在 `Minecraft-Transit-Railway` 目录执行：
+游戏内"资源包创建器"页面来自 `website/` 下的 Angular 应用，其构建产物（`website/dist/website/browser/`）会在 `:fabric:setupFiles` 时被嵌入生成的 `WebserverResources` 类。**构建模组前必须先完成网站构建**：若 `website/dist/website/browser/index.html` 不存在，`setupFiles` 会自动执行 `npm install` 与 `npm run build`（需要安装 Node.js），构建失败时会给出明确提示；也可以手动执行 `./gradlew :fabric:buildWebsite` 或在 `website/` 目录自行 `npm install && npm run build`。若构建出的模组缺少该网站资源，游戏内打开"资源包创建器"将无法显示创建器（会显示明确错误页，而不是跳转到线路图页面）。
+
+在 `Minecraft-Transit-Railway` 目录执行（`setupFiles` 会按需自动构建 `website/`，也可先手动执行 `./gradlew :fabric:buildWebsite`）：
 
 ```sh
 ./gradlew :fabric:setupFiles :fabric:test :fabric:build -PmodLoader=fabric -PminecraftVersion=1.20.4
