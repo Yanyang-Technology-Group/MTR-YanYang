@@ -5,10 +5,15 @@ import org.mtr.core.data.Platform;
 import org.mtr.core.data.Position;
 import org.mtr.core.data.Station;
 import org.mtr.core.operation.DataRequest;
-import org.mtr.core.servlet.WebServlet;
+import org.mtr.core.servlet.HttpResponseStatus;
+import org.mtr.core.servlet.ServletBase;
 import org.mtr.core.servlet.Webserver;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.mtr.libraries.javax.servlet.AsyncContext;
 import org.mtr.libraries.javax.servlet.MultipartConfigElement;
+import org.mtr.libraries.javax.servlet.http.HttpServlet;
+import org.mtr.libraries.javax.servlet.http.HttpServletRequest;
+import org.mtr.libraries.javax.servlet.http.HttpServletResponse;
 import org.mtr.libraries.org.eclipse.jetty.servlet.ServletHolder;
 import org.mtr.mapping.holder.*;
 import org.mtr.mapping.mapper.GraphicsHolder;
@@ -563,10 +568,60 @@ public final class InitClient {
 		webserver.addServlet(resourcePackCreatorUploadServletHolder, "/mtr/api/creator/upload/*");
 	}
 
-	private static class ResourcePackCretorWebServlet extends WebServlet {
+	/**
+	 * Serves the Resource Pack Creator website. Unlike the upstream {@code WebServlet}, this implementation does not
+	 * redirect to the parent path ({@code ..}) when a resource is missing. Previously, if the mod was built without the
+	 * website build output embedded into {@code WebserverResources} (empty generated class), opening the Resource Pack
+	 * Creator redirected to {@code /}, which is the Transport System Map page. Now a clear error page is shown instead.
+	 */
+	private static class ResourcePackCretorWebServlet extends HttpServlet {
+
+		private static final String CREATOR_UNAVAILABLE_PAGE = "<!DOCTYPE html><html lang=\"zh\"><head><meta charset=\"UTF-8\"><title>Resource Pack Creator Unavailable / 资源包创建器不可用</title>" +
+				"<style>body{font-family:system-ui,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;color:#333}" +
+				".card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.12);max-width:640px;padding:32px 40px;margin:16px}" +
+				"h1{font-size:22px;margin:0 0 6px}h2{font-size:16px;font-weight:400;color:#666;margin:0 0 18px;border-bottom:1px solid #eee;padding-bottom:12px}" +
+				"p,li{font-size:14px;line-height:1.7}code{background:#eee;border-radius:4px;padding:1px 6px;font-size:13px}ol{padding-left:20px}</style></head>" +
+				"<body><div class=\"card\"><h1>⚠️ 资源包创建器不可用</h1><h2>Resource Pack Creator Unavailable</h2>" +
+				"<p>此模组构建中未包含资源包创建器的网页资源（构建模组时未嵌入 <code>website/dist</code> 构建产物），因此无法显示创建器页面。</p>" +
+				"<p>This build of the mod is missing the Resource Pack Creator web assets (the <code>website/dist</code> build output was not embedded when the mod jar was compiled), so the creator cannot be displayed.</p>" +
+				"<p><b>解决方法 / How to fix:</b></p>" +
+				"<ol><li>请从发布页重新下载包含完整资源的构建版本。</li>" +
+				"<li>自行构建时，请先在仓库的 <code>website</code> 目录执行 <code>npm install</code> 和 <code>npm run build</code>，再执行 <code>./gradlew fabric:setupFiles</code> 与 <code>./gradlew build</code>。</li>" +
+				"<li>If you built the jar yourself, run <code>npm install</code> and <code>npm run build</code> inside the <code>website</code> directory before <code>./gradlew fabric:setupFiles</code> and <code>./gradlew build</code>, then rebuild.</li></ol>" +
+				"</div></body></html>";
+
+		private final Function<String, String> contentProvider;
+		private final String expectedPath;
 
 		public ResourcePackCretorWebServlet(Function<String, String> contentProvider, String expectedPath) {
-			super(contentProvider, expectedPath);
+			this.contentProvider = contentProvider;
+			this.expectedPath = expectedPath;
+		}
+
+		@Override
+		protected void doGet(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
+			final AsyncContext asyncContext = httpServletRequest.startAsync();
+			asyncContext.setTimeout(0);
+
+			final String requestUri = httpServletRequest.getRequestURI();
+			if (requestUri.startsWith(expectedPath)) {
+				final String path = removeLastSlash(requestUri.replace(expectedPath, ""));
+				final String newPath = path.isEmpty() ? "index.html" : path;
+				final String content = contentProvider.apply(newPath);
+				if (content == null) {
+					// Show a clear error page instead of redirecting to ".." (the Transport System Map)
+					ServletBase.sendResponse(httpServletResponse, asyncContext, CREATOR_UNAVAILABLE_PAGE, ServletBase.getMimeType("index.html"), HttpResponseStatus.OK);
+				} else {
+					ServletBase.sendResponse(httpServletResponse, asyncContext, content, ServletBase.getMimeType(newPath), HttpResponseStatus.OK);
+				}
+			} else {
+				// Redirect "/creator" (no trailing slash) to "/creator/" instead of ".." (which went to the Transport System Map)
+				ServletBase.sendResponse(httpServletResponse, asyncContext, expectedPath, "", HttpResponseStatus.REDIRECT);
+			}
+		}
+
+		private static String removeLastSlash(String text) {
+			return text.isEmpty() || text.charAt(text.length() - 1) != '/' ? text : text.substring(0, text.length() - 1);
 		}
 	}
 }
