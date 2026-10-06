@@ -3,6 +3,7 @@ import org.mtr.BuildTools
 import org.mtr.core.Generator
 import org.mtr.core.WebserverSetup
 import java.io.File
+import java.util.zip.ZipFile
 
 plugins {
 	id("net.neoforged.moddev")
@@ -126,7 +127,7 @@ tasks {
 				return@doLast
 			}
 			for (jarFile in tscJars) {
-				java.util.zip.ZipFile(jarFile).use { zip ->
+				ZipFile(jarFile).use { zip ->
 					val entry = zip.getEntry("org/mtr/core/generated/WebserverResources.class")
 					val size = entry?.size ?: -1L
 					if (entry == null || size < 100_000L) {
@@ -201,15 +202,21 @@ tasks {
 		Generator.generateTypeScript(project, "schema/resource", "../../website/src/app/entity/generated")
 
 		val npmCommand = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "npm.cmd" else "npm"
+		// Gradle 9 removed Project.exec; spawn the process directly so npm output streams to the console
+		fun runCommand(vararg args: String) {
+			val process = ProcessBuilder(listOf(npmCommand, *args))
+				.directory(websiteDir)
+				.redirectOutput(ProcessBuilder.Redirect.INHERIT)
+				.redirectError(ProcessBuilder.Redirect.INHERIT)
+				.start()
+			val exitCode = process.waitFor()
+			if (exitCode != 0) {
+				throw GradleException("npm command failed with exit code $exitCode in $websiteDir (command: ${args.joinToString()})")
+			}
+		}
 		try {
-			project.exec {
-				workingDir(websiteDir)
-				commandLine(npmCommand, "install", "--no-audit", "--no-fund")
-			}
-			project.exec {
-				workingDir(websiteDir)
-				commandLine(npmCommand, "run", "build")
-			}
+			runCommand("install", "--no-audit", "--no-fund")
+			runCommand("run", "build")
 		} catch (e: Exception) {
 			throw GradleException(
 				"Failed to build the Resource Pack Creator website. " +
