@@ -7,7 +7,6 @@ import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.mod.generated.resource.VehicleResourceWrapperSchema;
 
 import javax.annotation.Nullable;
-import java.util.stream.Collectors;
 
 public final class VehicleResourceWrapper extends VehicleResourceWrapperSchema {
 
@@ -97,9 +96,9 @@ public final class VehicleResourceWrapper extends VehicleResourceWrapperSchema {
 				description,
 				wikipediaArticle,
 				tags,
-				models.stream().map(vehicleModelWrapper -> vehicleModelWrapper.toVehicleModel(resourceProvider, modelPropertiesMap, positionDefinitionsMap)).collect(Collectors.toCollection(ObjectArrayList::new)),
-				bogie1Models.stream().map(vehicleModelWrapper -> vehicleModelWrapper.toVehicleModel(resourceProvider, modelPropertiesMap, positionDefinitionsMap)).collect(Collectors.toCollection(ObjectArrayList::new)),
-				bogie2Models.stream().map(vehicleModelWrapper -> vehicleModelWrapper.toVehicleModel(resourceProvider, modelPropertiesMap, positionDefinitionsMap)).collect(Collectors.toCollection(ObjectArrayList::new)),
+				toVehicleModels(models, "models", resourceProvider, modelPropertiesMap, positionDefinitionsMap),
+				toVehicleModels(bogie1Models, "bogie1_models", resourceProvider, modelPropertiesMap, positionDefinitionsMap),
+				toVehicleModels(bogie2Models, "bogie2_models", resourceProvider, modelPropertiesMap, positionDefinitionsMap),
 				hasGangway1,
 				hasGangway2,
 				hasBarrier1,
@@ -118,6 +117,20 @@ public final class VehicleResourceWrapper extends VehicleResourceWrapperSchema {
 
 	public String getId() {
 		return id;
+	}
+
+	private ObjectArrayList<VehicleModel> toVehicleModels(
+				ObjectArrayList<VehicleModelWrapper> modelWrappers,
+				String modelType,
+				ResourceProvider resourceProvider,
+				@Nullable Object2ObjectArrayMap<String, ModelProperties> modelPropertiesMap,
+				@Nullable Object2ObjectArrayMap<String, PositionDefinitions> positionDefinitionsMap
+	) {
+		final ObjectArrayList<VehicleModel> vehicleModels = new ObjectArrayList<>();
+		for (int i = 0; i < modelWrappers.size(); i++) {
+			vehicleModels.add(modelWrappers.get(i).toVehicleModel(resourceProvider, modelPropertiesMap, positionDefinitionsMap, id, modelType, modelWrappers.size() > 1 ? i + 1 : 0));
+		}
+		return vehicleModels;
 	}
 
 	void clean() {

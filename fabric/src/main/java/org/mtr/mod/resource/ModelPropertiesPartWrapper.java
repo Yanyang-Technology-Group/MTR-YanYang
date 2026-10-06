@@ -3,7 +3,6 @@ package org.mtr.mod.resource;
 import org.mtr.core.serializer.ReaderBase;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectObjectImmutablePair;
-import org.mtr.mod.Init;
 import org.mtr.mod.generated.resource.ModelPropertiesPartWrapperSchema;
 
 public final class ModelPropertiesPartWrapper extends ModelPropertiesPartWrapperSchema {
@@ -70,7 +69,9 @@ public final class ModelPropertiesPartWrapper extends ModelPropertiesPartWrapper
 	}
 
 	ObjectObjectImmutablePair<ModelPropertiesPart, PositionDefinition> toModelPropertiesPartAndPositionDefinition() {
-		final String name = Init.randomString();
+		// Reuse the visible part name instead of a random string, so "positionDefinitions" in the properties file
+		// and "name" in the position definitions file both default to the part's "names" value
+		final String name = getName();
 		final ObjectArrayList<PartPosition> positions = new ObjectArrayList<>();
 		final ObjectArrayList<PartPosition> positionsFlipped = new ObjectArrayList<>();
 		positionDefinition.getPositionLists((partPositions, partPositionsFlipped) -> {

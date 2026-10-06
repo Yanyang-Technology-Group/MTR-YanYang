@@ -11,6 +11,7 @@ import org.mtr.mod.client.CustomResourceLoader;
 import org.mtr.mod.generated.resource.VehicleModelWrapperSchema;
 
 import javax.annotation.Nullable;
+import java.util.Locale;
 
 public final class VehicleModelWrapper extends VehicleModelWrapperSchema {
 
@@ -82,7 +83,10 @@ public final class VehicleModelWrapper extends VehicleModelWrapperSchema {
 	VehicleModel toVehicleModel(
 			ResourceProvider resourceProvider,
 			@Nullable Object2ObjectArrayMap<String, ModelProperties> modelPropertiesMap,
-			@Nullable Object2ObjectArrayMap<String, PositionDefinitions> positionDefinitionsMap
+			@Nullable Object2ObjectArrayMap<String, PositionDefinitions> positionDefinitionsMap,
+			String vehicleId,
+			String modelType,
+			int modelIndex
 	) {
 		final ObjectArrayList<ModelPropertiesPart> modelPropertiesPartList = new ObjectArrayList<>();
 		final ObjectArrayList<PositionDefinition> positionDefinitionList = new ObjectArrayList<>();
@@ -93,7 +97,7 @@ public final class VehicleModelWrapper extends VehicleModelWrapperSchema {
 		});
 
 		final boolean isMinecraftResource = CustomResourceLoader.getMinecraftModelResources().stream().anyMatch(minecraftModelResource -> minecraftModelResource.matchesModelResource(modelResource));
-		final String modelPropertiesResource = isMinecraftResource ? minecraftModelPropertiesResource : new Identifier(Init.MOD_ID, String.format("properties_%s.json", Init.randomString())).data.toString();
+		final String modelPropertiesResource = isMinecraftResource ? minecraftModelPropertiesResource : formatCustomResourceIdentifier("properties", vehicleId, modelType, modelIndex);
 		final ModelProperties modelProperties = new ModelProperties(
 				modelPropertiesPartList,
 				modelYOffset,
@@ -118,7 +122,7 @@ public final class VehicleModelWrapper extends VehicleModelWrapperSchema {
 				barrierYOffset,
 				barrierZOffset
 		);
-		final String positionDefinitionsResource = isMinecraftResource ? minecraftPositionDefinitionsResource : new Identifier(Init.MOD_ID, String.format("definition_%s.json", Init.randomString())).data.toString();
+		final String positionDefinitionsResource = isMinecraftResource ? minecraftPositionDefinitionsResource : formatCustomResourceIdentifier("definition", vehicleId, modelType, modelIndex);
 		final PositionDefinitions positionDefinitions = new PositionDefinitions(positionDefinitionList);
 
 		if (!isMinecraftResource && modelPropertiesMap != null && positionDefinitionsMap != null) {
@@ -147,6 +151,25 @@ public final class VehicleModelWrapper extends VehicleModelWrapperSchema {
 					}
 				}
 		);
+	}
+
+	/**
+	 * Builds a readable resource identifier such as {@code properties_<vehicleId>_models.json} (or {@code _bogie1_models.json} /
+	 * {@code _bogie2_models.json} for bogie models), placed in the same directory as the model resource. If a vehicle has
+	 * multiple models of the same type, a numeric suffix is appended to keep the file names unique.
+	 */
+	private String formatCustomResourceIdentifier(String prefix, String vehicleId, String modelType, int modelIndex) {
+		final String sanitizedModelResource = CustomResourceTools.formatIdentifierString(modelResource);
+		final int separatorIndex = sanitizedModelResource.indexOf(':');
+		final String rawNamespace = separatorIndex > 0 ? sanitizedModelResource.substring(0, separatorIndex) : "";
+		final String namespace = rawNamespace.matches("[a-z0-9_.-]+") ? rawNamespace : Init.MOD_ID;
+		final String sanitizedPath = separatorIndex >= 0 ? sanitizedModelResource.substring(separatorIndex + 1) : sanitizedModelResource;
+		final int lastSlashIndex = sanitizedPath.lastIndexOf('/');
+		final String directory = lastSlashIndex >= 0 ? sanitizedPath.substring(0, lastSlashIndex + 1) : "";
+		final String sanitizedVehicleId = vehicleId.toLowerCase(Locale.ENGLISH).replaceAll("[^a-z0-9_-]", "_").replaceAll("^_+|_+$", "");
+		final String safeVehicleId = sanitizedVehicleId.isEmpty() ? "vehicle" : sanitizedVehicleId;
+		final String uniqueSuffix = modelIndex > 0 ? String.format("_%d", modelIndex) : "";
+		return new Identifier(namespace, String.format("%s%s_%s_%s%s.json", directory, prefix, safeVehicleId, modelType, uniqueSuffix)).data.toString();
 	}
 
 	void clean() {
