@@ -18,7 +18,7 @@ import {EditVehicleModelPartsDialog} from "../edit-vehicle-model-parts/edit-vehi
 import {VehicleResourceWrapperDTO} from "../../entity/generated/vehicleResourceWrapper";
 import {VehicleModelWrapperDTO} from "../../entity/generated/vehicleModelWrapper";
 
-export const CREATE_VEHICLE_RESOURCE = () => new VehicleResourceWrapperDTO("my_vehicle", "My Custom Vehicle", Math.floor(Math.random() * 0xFFFFFF).toString(16).toUpperCase().padStart(6, "0"), "TRAIN", 25, 2, -8.5, 8.5, 0, 0, "This is my custom vehicle!", "", false, false, false, false, 0, "a_train", "", 0, false, false, "", 0);
+export const CREATE_VEHICLE_RESOURCE = () => new VehicleResourceWrapperDTO("my_vehicle", "我的自定义载具", Math.floor(Math.random() * 0xFFFFFF).toString(16).toUpperCase().padStart(6, "0"), "TRAIN", 25, 2, -8.5, 8.5, 0, 0, "这是我的自定义载具！", "", false, false, false, false, 0, "a_train", "", 0, false, false, "", 0);
 export const CREATE_MODEL = () => new VehicleModelWrapperDTO("", "", "", "", true, 1, "", "", "", "", "", "", 1.5, 2.25, 1, 0.5, "", "", "", "", "", "", 2.25, 1, 1.25, 0.25);
 
 @Component({
@@ -79,9 +79,9 @@ export class EditComponent {
 	manageModels() {
 		this.dialog.open(ManageResourcesDialog, {
 			data: {
-				title: "Models",
-				addText: "Add Model",
-				deleteText: "Delete Model",
+				title: "模型",
+				addText: "添加模型",
+				deleteText: "删除模型",
 				fileExtensions: ["bbmodel", "obj", "mqo", "mqoz", "mtl"],
 				listCustomSupplier: () => this.dataService.models().map(modelWrapper => modelWrapper.id),
 				listMinecraftSupplier: () => this.dataService.minecraftModelResources().map(minecraftModelResource => minecraftModelResource.modelResource),
@@ -92,9 +92,9 @@ export class EditComponent {
 	manageTextures() {
 		this.dialog.open(ManageResourcesDialog, {
 			data: {
-				title: "Textures",
-				addText: "Add Texture",
-				deleteText: "Delete Texture",
+				title: "贴图",
+				addText: "添加贴图",
+				deleteText: "删除贴图",
 				fileExtensions: ["png"],
 				listCustomSupplier: () => this.dataService.textures(),
 				listMinecraftSupplier: () => this.dataService.minecraftTextureResources(),

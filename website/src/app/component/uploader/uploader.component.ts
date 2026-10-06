@@ -43,10 +43,10 @@ export class UploaderComponent {
 			for (let i = 0; i < input.files.length; i++) {
 				const fileNameSplit = input.files[i].name.split(".");
 				if (fileNameSplit.length < 2) {
-					this.error = "Invalid file name!";
+					this.error = "无效的文件名！";
 					return;
 				} else if (this.fileExtensions.every(fileExtension => fileExtension.toLowerCase() !== fileNameSplit[fileNameSplit.length - 1].toLowerCase())) {
-					this.error = "Invalid file type!";
+					this.error = "无效的文件类型！";
 					return;
 				} else {
 					const newFileNameSplit = [];
@@ -58,7 +58,7 @@ export class UploaderComponent {
 			}
 
 			if (fileNames.length == 0) {
-				this.error = "No file selected!";
+				this.error = "未选择任何文件！";
 				return;
 			}
 

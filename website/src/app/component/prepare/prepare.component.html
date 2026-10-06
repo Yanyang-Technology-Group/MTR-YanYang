@@ -3,19 +3,19 @@
 		<div class="spacing"></div>
 		@if (hasData()) {
 			<app-large-tile [clickable]="true" icon="undo" (clicked)="openResetDialog()">
-				<h2>Reset Resource Pack Creator</h2>
-				<div>This will clear all progress and unsaved changes.</div>
+				<h2>重置资源包创建器</h2>
+				<div>这将清除所有进度和未保存的更改</div>
 			</app-large-tile>
 		} @else {
 			<div class="row gap center">
 				<app-large-tile [clickable]="true" icon="add" [disabled]="!!uploader.getFileNames()" (clicked)="create()">
-					<h2>Create New Resource Pack</h2>
-					<div>The sky's the limit!</div>
+					<h2>创建新资源包</h2>
+					<div>尽情发挥你的创意</div>
 				</app-large-tile>
 				<mat-divider class="divider" vertical/>
 				<app-large-tile [clickable]="true" icon="edit" [disabled]="!!uploader.getFileNames()" (clicked)="uploader.upload()">
-					<h2>Edit Existing Resource Pack</h2>
-					<div>Make it your own!</div>
+					<h2>编辑现有资源包</h2>
+					<div>打造属于你的资源包</div>
 				</app-large-tile>
 			</div>
 		}

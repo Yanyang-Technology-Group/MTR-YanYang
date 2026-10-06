@@ -10,13 +10,13 @@
 		<app-large-tile [clickable]="false" icon="warning">
 			<div class="column gap center">
 				<div class="column gap-small center">
-					<h2>Connection Failed</h2>
-					<div>Is your Minecraft world open?</div>
+					<h2>连接失败</h2>
+					<div>请确认 Minecraft 世界是否已打开</div>
 				</div>
 				<div>
 					<button mat-button (click)="retry()">
 						<mat-icon>refresh</mat-icon>
-						Retry
+				重试
 					</button>
 				</div>
 			</div>
@@ -26,22 +26,22 @@
 } @else {
 	<div class="outer wrapper">
 		<mat-stepper class="wrapper" #stepper linear>
-			<mat-step class="wrapper" label="Prepare" [completed]="hasData()">
+			<mat-step class="wrapper" label="准备" [completed]="hasData()">
 				<ng-template class="wrapper" matStepContent>
 					<app-prepare class="wrapper" (nextStep)="stepper.next()"/>
 				</ng-template>
 			</mat-step>
-			<mat-step class="wrapper" label="Design" [completed]="hasData()">
+			<mat-step class="wrapper" label="设计" [completed]="hasData()">
 				<ng-template class="wrapper" matStepContent>
 					<app-edit class="wrapper"/>
 				</ng-template>
 			</mat-step>
-			<mat-step class="wrapper" label="Preview" [completed]="hasData()">
+			<mat-step class="wrapper" label="预览" [completed]="hasData()">
 				<ng-template class="wrapper" matStepContent>
 					<app-preview class="wrapper"/>
 				</ng-template>
 			</mat-step>
-			<mat-step label="Export" [completed]="false">
+			<mat-step label="导出" [completed]="false">
 				<ng-template class="wrapper" matStepContent>
 					<app-export class="wrapper"/>
 				</ng-template>
