@@ -1,6 +1,5 @@
 package org.mtr.resource;
 
-import org.mtr.MTR;
 import org.mtr.core.serializer.ReaderBase;
 import org.mtr.generated.resource.ModelPropertiesPartWrapperSchema;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -70,7 +69,9 @@ public final class ModelPropertiesPartWrapper extends ModelPropertiesPartWrapper
 	}
 
 	ObjectObjectImmutablePair<ModelPropertiesPart, PositionDefinition> toModelPropertiesPartAndPositionDefinition() {
-		final String name = MTR.randomString();
+		// Reuse the visible part name instead of a random string, so "positionDefinitions" in the properties file
+		// and "name" in the position definitions file both default to the part's "names" value
+		final String name = getName();
 		final ObjectArrayList<PartPosition> positions = new ObjectArrayList<>();
 		final ObjectArrayList<PartPosition> positionsFlipped = new ObjectArrayList<>();
 		positionDefinition.getPositionLists((partPositions, partPositionsFlipped) -> {
