@@ -100,8 +100,9 @@ As an alternative, Gradle will also use the `GITHUB_TOKEN` environment variable 
 From the repository root:
 
 ```powershell
-# Setup files (one-time)
+# Setup files (one-time); also builds website/ automatically when Node.js is available
 .\gradlew.bat setupFiles -PcrowdinApiKey="<key>" -PpatreonApiKey="<key>"
+# (If Node.js is unavailable, build website/ manually first: cd website && npm install && npm run build)
 
 # Set active version and build Fabric
 .\gradlew.bat "Set active project to 1.21.4-fabric"

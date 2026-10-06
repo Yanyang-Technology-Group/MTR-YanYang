@@ -105,6 +105,31 @@ Available versions are in `versions/` (e.g., `versions/1.21.4-fabric/`, `version
 .\gradlew.bat :neoforge:build
 ```
 
+## Website (Resource Pack Creator)
+
+The in-game **Resource Pack Creator** is an Angular application in `website/`. Its build output
+(`website/dist/website/browser/`) is embedded into the mod jar as the generated
+`WebserverResources` class when `setupFiles` runs.
+
+> **Important:** the website must be built before `setupFiles` is executed. The build now
+> handles this automatically (`ensureWebsiteBuilt()` runs `npm install` / `npm run build`
+> when `website/dist/website/browser/index.html` is missing, and fails with a clear message
+> when Node.js is unavailable), but you can also build it manually:
+>
+> ```powershell
+> .\gradlew.bat setupWebsiteFiles   # generate TypeScript entities into website/src/app/entity/generated/
+> cd website
+> npm install
+> npm run build
+> cd ..
+> .\gradlew.bat setupFiles
+> ```
+>
+> If the mod jar is built **without** the website output, the Resource Pack Creator button
+> opens `/creator/`, which can no longer silently redirect to the Transport System Map —
+> it now shows an explicit error page — but the creator itself will not work until the jar
+> is rebuilt with the website assets embedded.
+
 ## Website development
 
 From `website/`:
