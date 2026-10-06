@@ -103,6 +103,8 @@ From the repository root:
 # Setup files (one-time); also builds website/ automatically when Node.js is available
 .\gradlew.bat setupFiles -PcrowdinApiKey="<key>" -PpatreonApiKey="<key>"
 # (If Node.js is unavailable, build website/ manually first: cd website && npm install && npm run build)
+# The Transport System Map website ships inside the transport-simulation-core dependency;
+# the build verifies it is embedded and fails clearly if the artifact is broken.
 
 # Set active version and build Fabric
 .\gradlew.bat "Set active project to 1.21.4-fabric"

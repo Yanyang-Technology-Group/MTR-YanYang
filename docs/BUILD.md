@@ -130,6 +130,34 @@ The in-game **Resource Pack Creator** is an Angular application in `website/`. I
 > it now shows an explicit error page — but the creator itself will not work until the jar
 > is rebuilt with the website assets embedded.
 
+## Transport System Map (Transport-Simulation-Core dependency)
+
+The in-game **Transport System Map** website (the page served at `/`) is *not* built from this
+repository. It ships inside the `org.mtr:transport-simulation-core` dependency artifact
+(`org/mtr/core/generated/WebserverResources.class` in that jar), which the mod shades into its
+own jar at build time.
+
+The build now runs the `verifyTransportSimulationCore` task before `shadowJar` for every
+platform/version combination. It opens the resolved TSC jar and fails the build with an
+explicit error if the embedded `WebserverResources.class` is missing or nearly empty. This
+guards against a TSC artifact that was **built without its Angular website** — exactly the
+defect that shipped in the 1.21.x release jars (an 815-byte empty class instead of the
+expected ~2 MB one, which broke the Transport System Map page).
+
+If the check fails:
+
+1. Rebuild Transport-Simulation-Core from a checkout that embeds the website. The upstream
+   `Minecraft-Transit-Railway/Transport-Simulation-Core` CI artifact already embeds it; a
+   fixed local build runs the website build automatically before `setupWebserver`.
+2. Refresh the dependency (`./gradlew --refresh-dependencies` or bump the artifact), then
+   rebuild the mod.
+
+Running the check manually:
+
+```powershell
+.\gradlew.bat verifyTransportSimulationCore
+```
+
 ## Website development
 
 From `website/`:
@@ -166,6 +194,9 @@ If you only changed docs or comments, a full build is optional, but a quick `:co
 - **Build fails with platform/version mismatch**
 	- Ensure you've set the active project before running build tasks (e.g., `"Set active project to 1.21.4-fabric"`).
 	- Verify the version directory exists in `versions/` matching your target.
+- **`verifyTransportSimulationCore` fails: artifact does not embed the Transport System Map website**
+	- The resolved `org.mtr:transport-simulation-core` jar was built without its Angular website.
+	- Rebuild Transport-Simulation-Core from a checkout that embeds the website (its fixed build does this automatically) and refresh the dependency.
 - **IDE shows compilation errors after checkout**
 	- Stonecutter directives (e.g., `//? if fabric {`) may not be recognized by your IDE's language server.
 	- Run Gradle tasks to generate the correct variant, or configure IDE to understand Stonecutter syntax.

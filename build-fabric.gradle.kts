@@ -114,11 +114,47 @@ tasks {
 		(options as StandardJavadocDocletOptions).addStringOption("Xdoclint:all,-missing", "-quiet")
 	}
 
+	// Verifies that the Transport-Simulation-Core artifact being shaded into the mod actually embeds the
+	// Transport System Map website. A TSC jar built without building its Angular website first contains an
+	// (almost) empty org.mtr.core.generated.WebserverResources class, and every mod shaded with it serves a
+	// broken Transport System Map page at runtime - exactly how the 1.21.x release jars ended up broken.
+	val verifyTransportSimulationCoreTask = register("verifyTransportSimulationCore") {
+		group = "verification"
+		description = "Verifies that the Transport-Simulation-Core dependency embeds the Transport System Map website."
+
+		doLast {
+			val tscJars = configurations.getByName("shadowBundle").resolve()
+				.filter { it.isFile && it.extension == "jar" }
+				.filter { val n = it.nameWithoutExtension.lowercase(); n.startsWith("transport-simulation-core") && !n.contains("build-tools") && !n.contains("sources") && !n.contains("javadoc") }
+			if (tscJars.isEmpty()) {
+				println("No Transport-Simulation-Core jar found on the shadowBundle classpath, skipping verification")
+				return@doLast
+			}
+			for (jarFile in tscJars) {
+				java.util.zip.ZipFile(jarFile).use { zip ->
+					val entry = zip.getEntry("org/mtr/core/generated/WebserverResources.class")
+					val size = entry?.size ?: -1L
+					if (entry == null || size < 100_000L) {
+						throw GradleException(
+							"Transport-Simulation-Core artifact ${jarFile.name} does not embed the Transport System Map website " +
+									"(org/mtr/core/generated/WebserverResources.class is ${if (entry == null) "missing" else "$size bytes"}). " +
+									"The jar was built without building the Angular website in website/dist/website/browser first. " +
+									"Rebuild Transport-Simulation-Core from a checkout that embeds the website (a fixed build runs the website build automatically), " +
+									"then refresh the dependency and build again. Without this check the mod would silently ship a broken Transport System Map page.")
+					}
+					println("Transport System Map website verified in ${jarFile.name} (WebserverResources.class: $size bytes)")
+				}
+			}
+		}
+	}
+
 	shadowJar {
 		configurations = listOf(project.configurations["shadowBundle"])
 		minimize()
 		relocate("com.logisticscraft", "org.mtr.libraries.com.logisticscraft")
 		relocate("de.javagl", "org.mtr.libraries.de.javagl")
+
+		dependsOn(verifyTransportSimulationCoreTask)
 	}
 
 	remapJar {
