@@ -2,6 +2,7 @@ import org.apache.tools.ant.filters.ReplaceTokens
 import org.mtr.BuildTools
 import org.mtr.core.Generator
 import org.mtr.core.WebserverSetup
+import java.io.File
 
 plugins {
 	id("net.neoforged.moddev")
@@ -148,8 +149,59 @@ tasks {
 		Generator.generateTypeScript(project, "schema/resource", "../../website/src/app/entity/generated")
 	}
 
+	// Ensures the Resource Pack Creator website has been built into website/dist/website/browser.
+	// WebserverSetup.setup (called from setupFiles) embeds every file in that directory into the generated
+	// WebserverResources class. If the directory is missing, an empty WebserverResources is silently generated and the
+	// in-game Resource Pack Creator button redirects to the Transport System Map instead of opening the creator.
+	fun ensureWebsiteBuilt() {
+		val websiteDir = File(project.rootDir, "website")
+		val distBrowserDir = File(websiteDir, "dist/website/browser")
+		if (File(distBrowserDir, "index.html").exists()) {
+			return
+		}
+
+		println("Resource Pack Creator website build output not found at $distBrowserDir, building it now...")
+		// The website imports generated TypeScript entities, regenerate them before compiling the Angular app
+		Generator.generateTypeScript(project, "schema/resource", "../../website/src/app/entity/generated")
+
+		val npmCommand = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "npm.cmd" else "npm"
+		try {
+			project.exec {
+				workingDir(websiteDir)
+				commandLine(npmCommand, "install", "--no-audit", "--no-fund")
+			}
+			project.exec {
+				workingDir(websiteDir)
+				commandLine(npmCommand, "run", "build")
+			}
+		} catch (e: Exception) {
+			throw GradleException(
+				"Failed to build the Resource Pack Creator website. " +
+						"Please install Node.js, then run `npm install` and `npm run build` inside the `website` directory before building the mod. " +
+						"Without the built website, the generated WebserverResources is empty and the Resource Pack Creator would redirect to the Transport System Map.",
+				e)
+		}
+		if (!File(distBrowserDir, "index.html").exists()) {
+			throw GradleException(
+				"The Resource Pack Creator website build output is still missing ($distBrowserDir/index.html). " +
+						"Run `npm install` and `npm run build` inside the `website` directory, then build the mod again. " +
+						"Without the built website, the generated WebserverResources is empty and the Resource Pack Creator would redirect to the Transport System Map.")
+		}
+	}
+
+	register("buildWebsite") {
+		group = "build"
+		description = "Builds the Resource Pack Creator website (Angular) so it can be embedded into WebserverResources. Requires Node.js."
+		doLast {
+			ensureWebsiteBuilt()
+		}
+	}
+
 	register("setupFiles") {
 		description = "Sets up necessary files for the mod, including generating Java classes from templates and processing translations."
+
+		// Build the website first (if not already built) so WebserverSetup embeds real resources instead of generating an empty class
+		ensureWebsiteBuilt()
 
 		copy {
 			outputs.upToDateWhen { false }
