@@ -53,7 +53,7 @@ export class ManageResourcesDialog {
 		if (JSON.stringify(matchingPairsObj.sort()) === JSON.stringify(matchingPairsMtl.sort())) {
 			return undefined;
 		} else {
-			return "Each OBJ file must be uploaded with an MTL file of the same name!";
+			return "每个 OBJ 文件必须搭配同名的 MTL 文件一起上传！";
 		}
 	}
 

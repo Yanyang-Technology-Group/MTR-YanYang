@@ -16,12 +16,12 @@ import {VehicleResourceWrapperDTO} from "../../entity/generated/vehicleResourceW
 import {EditVehicleModelPartDialog} from "../edit-vehicle-model-part/edit-vehicle-model-part.dialog";
 
 const MAIN_COLUMNS: { id: string, title: string, formatData: (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => string }[] = [
-	{id: "positionDefinition", title: "Model Part", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.name},
-	{id: "positions", title: "Positions", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.positions.map(({x, y, z}) => `(${x}, ${y}, ${z})`).join("\n")},
-	{id: "positionsFlipped", title: "Flipped Positions", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.positionsFlipped.map(({x, y, z}) => `(${x}, ${y}, ${z})`).join("\n")},
-	{id: "condition", title: "Condition", formatData: modelPropertiesPart => modelPropertiesPart.condition === "NORMAL" ? "" : modelPropertiesPart.condition},
-	{id: "renderStage", title: "Render Stage", formatData: modelPropertiesPart => modelPropertiesPart.type === "NORMAL" ? modelPropertiesPart.renderStage : ""},
-	{id: "type", title: "Type", formatData: modelPropertiesPart => modelPropertiesPart.type},
+	{id: "positionDefinition", title: "模型部件", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.name},
+	{id: "positions", title: "位置", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.positions.map(({x, y, z}) => `(${x}, ${y}, ${z})`).join("\n")},
+	{id: "positionsFlipped", title: "镜像位置", formatData: modelPropertiesPart => modelPropertiesPart.positionDefinition.positionsFlipped.map(({x, y, z}) => `(${x}, ${y}, ${z})`).join("\n")},
+	{id: "condition", title: "显示条件", formatData: modelPropertiesPart => modelPropertiesPart.condition === "NORMAL" ? "" : modelPropertiesPart.condition},
+	{id: "renderStage", title: "渲染层级", formatData: modelPropertiesPart => modelPropertiesPart.type === "NORMAL" ? modelPropertiesPart.renderStage : ""},
+	{id: "type", title: "类型", formatData: modelPropertiesPart => modelPropertiesPart.type},
 ];
 
 const hasDoorMultiplier = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.doorXMultiplier !== 0 || modelPropertiesPart.doorZMultiplier !== 0;
@@ -29,36 +29,36 @@ const hasOpeningDoorTime = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) 
 const hasClosingDoorTime = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.renderFromClosingDoorTime !== 0 || modelPropertiesPart.renderUntilClosingDoorTime !== 0;
 const hasFlashTime = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.flashOnTime !== 0 || modelPropertiesPart.flashOffTime !== 0;
 const DOOR_COLUMNS: { id: string, title: string, formatData: (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => string }[] = [
-	{id: "doorXMultiplier", title: "Door X Multiplier", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorXMultiplier.toString() : ""},
-	{id: "doorZMultiplier", title: "Door Z Multiplier", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorZMultiplier.toString() : ""},
-	{id: "doorAnimationType", title: "Door Animation", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorAnimationType : ""},
-	{id: "renderFromOpeningDoorTime", title: "From Opening Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasOpeningDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderFromOpeningDoorTime.toString() : ""},
-	{id: "renderUntilOpeningDoorTime", title: "Until Opening Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasOpeningDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderUntilOpeningDoorTime.toString() : ""},
-	{id: "renderFromClosingDoorTime", title: "From Closing Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasClosingDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderFromClosingDoorTime.toString() : ""},
-	{id: "renderUntilClosingDoorTime", title: "Until Closing Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasClosingDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderUntilClosingDoorTime.toString() : ""},
-	{id: "flashOnTime", title: "Flash On Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasFlashTime(modelPropertiesPart) ? modelPropertiesPart.flashOnTime.toString() : ""},
-	{id: "flashOffTime", title: "Flash Off Time", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasFlashTime(modelPropertiesPart) ? modelPropertiesPart.flashOffTime.toString() : ""},
+	{id: "doorXMultiplier", title: "车门 X 系数", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorXMultiplier.toString() : ""},
+	{id: "doorZMultiplier", title: "车门 Z 系数", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorZMultiplier.toString() : ""},
+	{id: "doorAnimationType", title: "车门动画", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) ? modelPropertiesPart.doorAnimationType : ""},
+	{id: "renderFromOpeningDoorTime", title: "开门起始时间", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasOpeningDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderFromOpeningDoorTime.toString() : ""},
+	{id: "renderUntilOpeningDoorTime", title: "开门结束时间", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasOpeningDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderUntilOpeningDoorTime.toString() : ""},
+	{id: "renderFromClosingDoorTime", title: "关门起始时间", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasClosingDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderFromClosingDoorTime.toString() : ""},
+	{id: "renderUntilClosingDoorTime", title: "关门结束时间", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasClosingDoorTime(modelPropertiesPart) ? modelPropertiesPart.renderUntilClosingDoorTime.toString() : ""},
+	{id: "flashOnTime", title: "闪烁亮灯时长", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasFlashTime(modelPropertiesPart) ? modelPropertiesPart.flashOnTime.toString() : ""},
+	{id: "flashOffTime", title: "闪烁灭灯时长", formatData: modelPropertiesPart => hasDoorMultiplier(modelPropertiesPart) && hasFlashTime(modelPropertiesPart) ? modelPropertiesPart.flashOffTime.toString() : ""},
 ];
 
 const isDisplay = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.type === "DISPLAY";
 const isRouteColorDisplay = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.displayType === "ROUTE_COLOR" || modelPropertiesPart.displayType === "ROUTE_COLOR_ROUNDED";
 const isDepartureIndexDisplay = (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => modelPropertiesPart.displayType === "DEPARTURE_INDEX";
 const DISPLAY_COLUMNS: { id: string, title: string, formatData: (modelPropertiesPart: ModelPropertiesPartWrapperDTO) => string }[] = [
-	{id: "displayXPadding", title: "X Padding", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayXPadding.toString() : ""},
-	{id: "displayYPadding", title: "Y Padding", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayYPadding.toString() : ""},
-	{id: "displayColorCjk", title: "CJK Text Colour", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayColorCjk : ""},
-	{id: "displayColor", title: "Text Colour", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayColor : ""},
-	{id: "displayMaxLineHeight", title: "Max Line Height", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayMaxLineHeight.toString() : ""},
-	{id: "displayCjkSizeRatio", title: "CJK Size Ratio", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isDepartureIndexDisplay(modelPropertiesPart) ? modelPropertiesPart.displayCjkSizeRatio.toString() : ""},
-	{id: "displayPadZeros", title: "Pad Zeros", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && isDepartureIndexDisplay(modelPropertiesPart) ? modelPropertiesPart.displayPadZeros.toString() : ""},
-	{id: "displayType", title: "Type", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayType : ""},
-	{id: "displayDefaultText", title: "Default Text", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayDefaultText : ""},
+	{id: "displayXPadding", title: "X 内边距", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayXPadding.toString() : ""},
+	{id: "displayYPadding", title: "Y 内边距", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayYPadding.toString() : ""},
+	{id: "displayColorCjk", title: "中文文本颜色", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayColorCjk : ""},
+	{id: "displayColor", title: "文本颜色", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayColor : ""},
+	{id: "displayMaxLineHeight", title: "最大行高", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayMaxLineHeight.toString() : ""},
+	{id: "displayCjkSizeRatio", title: "中文字号比例", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isDepartureIndexDisplay(modelPropertiesPart) ? modelPropertiesPart.displayCjkSizeRatio.toString() : ""},
+	{id: "displayPadZeros", title: "补零位数", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && isDepartureIndexDisplay(modelPropertiesPart) ? modelPropertiesPart.displayPadZeros.toString() : ""},
+	{id: "displayType", title: "类型", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) ? modelPropertiesPart.displayType : ""},
+	{id: "displayDefaultText", title: "默认文本", formatData: modelPropertiesPart => isDisplay(modelPropertiesPart) && !isRouteColorDisplay(modelPropertiesPart) ? modelPropertiesPart.displayDefaultText : ""},
 ];
 
 export const CREATE_MODEL_PROPERTIES_PART = () => new ModelPropertiesPartWrapperDTO(
 	new PositionDefinitionDTO(""),
 	"NORMAL", "EXTERIOR", "NORMAL",
-	0, 0, "FF9900", "FF9900", 1.5, 2, 0, "DESTINATION", "Not In Service",
+	0, 0, "FF9900", "FF9900", 1.5, 2, 0, "DESTINATION", "暂停服务",
 	0, 0, "STANDARD", 0, 0, 0, 0, 0, 0,
 );
 

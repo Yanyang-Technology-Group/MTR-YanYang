@@ -13,22 +13,22 @@
 					}
 				</ng-template>
 				<mat-action-row>
-					<button mat-icon-button (click)="move(-2)" [disabled]="$index == 0" matTooltip="Move To Top">
+					<button mat-icon-button (click)="move(-2)" [disabled]="$index == 0" matTooltip="移至顶部">
 						<mat-icon>keyboard_double_arrow_up</mat-icon>
 					</button>
-					<button mat-icon-button (click)="move(-1)" [disabled]="$index == 0" matTooltip="Move Up">
+					<button mat-icon-button (click)="move(-1)" [disabled]="$index == 0" matTooltip="上移">
 						<mat-icon>keyboard_arrow_up</mat-icon>
 					</button>
-					<button mat-icon-button (click)="move(1)" [disabled]="$index == $count - 1" matTooltip="Move Down">
+					<button mat-icon-button (click)="move(1)" [disabled]="$index == $count - 1" matTooltip="下移">
 						<mat-icon>keyboard_arrow_down</mat-icon>
 					</button>
-					<button mat-icon-button (click)="move(2)" [disabled]="$index == $count - 1" matTooltip="Move To Bottom">
+					<button mat-icon-button (click)="move(2)" [disabled]="$index == $count - 1" matTooltip="移至底部">
 						<mat-icon>keyboard_double_arrow_down</mat-icon>
 					</button>
-					<button mat-icon-button (click)="duplicate()" matTooltip="Duplicate">
+					<button mat-icon-button (click)="duplicate()" matTooltip="复制">
 						<mat-icon>content_copy</mat-icon>
 					</button>
-					<button mat-icon-button (click)="delete()" matTooltip="Delete">
+					<button mat-icon-button (click)="delete()" matTooltip="删除">
 						<mat-icon>delete</mat-icon>
 					</button>
 				</mat-action-row>

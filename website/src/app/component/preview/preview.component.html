@@ -1,13 +1,13 @@
 <div class="column gap">
-	<mat-slide-toggle #toggle (change)="toggleDoors(toggle.checked)">Open Doors</mat-slide-toggle>
+	<mat-slide-toggle #toggle (change)="toggleDoors(toggle.checked)">开启车门</mat-slide-toggle>
 	<div class="row gap-small center">
 		<button mat-button (click)="resumeGame()">
 			<mat-icon>hide_image</mat-icon>
-			Hide Minecraft Pause Screen
+			隐藏 Minecraft 暂停画面
 		</button>
 		<button mat-button (click)="reload()">
 			<mat-icon>refresh</mat-icon>
-			Force Reload
+			强制重新加载
 		</button>
 	</div>
 </div>

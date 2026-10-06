@@ -65,7 +65,7 @@ export class EditVehicleModelPropertiesDialog {
 				write: key => modelKey = key,
 			}],
 		);
-		this.modelLists.push({label: "Custom", list: Object.keys(this.customModelList)});
+		this.modelLists.push({label: "自定义", list: Object.keys(this.customModelList)});
 		this.modelLists.push({label: "Minecraft", list: Object.keys(this.minecraftModelList)});
 
 		let textureKey = "";
@@ -133,7 +133,7 @@ export class EditVehicleModelPropertiesDialog {
 			() => true,
 			writeMatchingKeys,
 		);
-		this.textureLists.push({label: "Custom", list: Object.keys(this.customTextureList)});
+		this.textureLists.push({label: "自定义", list: Object.keys(this.customTextureList)});
 		this.textureLists.push({label: "Minecraft", list: Object.keys(this.minecraftTextureList)});
 
 		this.formGroup = new FormGroup({

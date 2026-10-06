@@ -1,7 +1,7 @@
 @if (getFileNames()) {
 	<div class="row gap-small center">
 		<mat-spinner [diameter]="24"/>
-		<div>Uploading <b>{{ getFileNames()?.join(", ") }}</b></div>
+		<div>正在上传 <b>{{ getFileNames()?.join(", ") }}</b></div>
 	</div>
 }
 @if (getError()) {

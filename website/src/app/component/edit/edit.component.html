@@ -2,15 +2,15 @@
 	<div class="row gap-small center">
 		<button mat-flat-button (click)="vehicleList.add()">
 			<mat-icon>add</mat-icon>
-			Add Vehicle
+				添加载具
 		</button>
 		<button mat-button (click)="manageModels()">
 			<mat-icon>library_books</mat-icon>
-			Manage Models
+				管理模型
 		</button>
 		<button mat-button (click)="manageTextures()">
 			<mat-icon>photo_library</mat-icon>
-			Manage Textures
+				管理贴图
 		</button>
 	</div>
 
@@ -32,20 +32,20 @@
 		<div>
 			<button mat-button (click)="editDetails(vehicleResource)">
 				<mat-icon>edit</mat-icon>
-				Edit Vehicle Properties
+						编辑载具属性
 			</button>
 		</div>
 		<mat-accordion displayMode="flat" multi>
 			@for (modelsPropertiesAndDefinitions of getAllModelsPropertiesAndDefinitions(vehicleResource); track $index) {
 				<mat-expansion-panel>
 					<mat-expansion-panel-header>
-						<mat-panel-title>Models:&nbsp;<b>{{ $index === 1 ? $count > 2 ? "Front Bogie" : "Bogie" : $index === 2 ? "Back Bogie" : "Main Vehicle" }}</b></mat-panel-title>
+						<mat-panel-title>模型：&nbsp;<b>{{ $index === 1 ? $count > 2 ? "前转向架" : "转向架" : $index === 2 ? "后转向架" : "载具主体" }}</b></mat-panel-title>
 					</mat-expansion-panel-header>
 					<div class="column gap">
 						<div>
 							<button mat-flat-button (click)="modelList.add()">
 								<mat-icon>add</mat-icon>
-								Add Model
+								添加模型
 							</button>
 						</div>
 						<app-accordion #modelList [list]="modelsPropertiesAndDefinitions" [createInstance]="createVehicleModelInstance" [headerTemplate]="modelHeaderTemplate" [contentTemplate]="modelContentTemplate" (changed)="dataService.update()"/>
@@ -59,11 +59,11 @@
 		<div class="row gap-small">
 			<button mat-button (click)="editModelProperties(vehicleResource, model)">
 				<mat-icon>edit</mat-icon>
-				Edit Model Properties
+						编辑模型属性
 			</button>
 			<button mat-button (click)="editModelParts(vehicleResource, model)" [disabled]="canEditModelParts(model)">
 				<mat-icon>edit</mat-icon>
-				Edit Model Parts
+						编辑模型部件
 			</button>
 		</div>
 	</ng-template>
