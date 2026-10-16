@@ -54,3 +54,18 @@ mtr_custom_resources.json
 **/font/mtr.json
 **/lang/*.json
 !en_us.json
+
+# Node dependencies and the Angular build output
+#
+# `:fabric:setupFiles` runs npm install and an Angular build for the resource pack
+# creator when website/dist is absent, which drops ~27,000 files into
+# website/node_modules and writes website/dist and website/.angular. The website has
+# its own .gitignore, but that file is generated and not committed, so it is empty on
+# a fresh checkout and the root ignore is the one that actually applies.
+#
+# This is not hypothetical: an earlier commit on this branch swept all 27,000 files in
+# because nothing ignored them, which is why the rules are here rather than left to the
+# generated file.
+node_modules/
+website/dist/
+website/.angular/

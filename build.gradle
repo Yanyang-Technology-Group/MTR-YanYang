@@ -49,6 +49,17 @@ subprojects {
 	}
 
 	tasks.withType(Javadoc).tap {
-		configureEach { javadoc.options.addStringOption("Xdoclint:none", "-quiet") }
+		configureEach {
+			javadoc.options.addStringOption("Xdoclint:none", "-quiet")
+			// The mod's sources contain non-ASCII characters in comments and strings, and
+			// javadoc defaults its input encoding to the platform default rather than to UTF-8.
+			// On a machine whose default is not UTF-8 that fails with "error: cannot read Input
+			// length = 1" and takes the whole :fabric:build down with it, even though every
+			// other task succeeds. This is not specific to any one change: it depends only on
+			// the platform default, which is why it passes on CI and fails on a Windows
+			// developer machine.
+			javadoc.options.encoding = "UTF-8"
+			javadoc.options.charSet = "UTF-8"
+		}
 	}
 }
