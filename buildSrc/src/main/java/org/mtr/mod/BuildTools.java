@@ -310,7 +310,63 @@ public class BuildTools {
 	public void copyBuildFile(boolean excludeAssets) throws IOException {
 		final Path directory = path.getParent().resolve("build/release");
 		Files.createDirectories(directory);
-		Files.copy(path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")), directory.resolve(String.format("YYMTR-%s-%s+%s-performance12%s.jar", loader, version, minecraftVersion, excludeAssets ? "-server" : "")), StandardCopyOption.REPLACE_EXISTING);
+		// YYMTR-<loader>.<modVersion>+<minecraftVersion>_<yyyy.mm.dd>.<commits>.jar
+		//
+		// The loader is shortened so the name stays readable at a glance: fab, for, neofor. The date
+		// and commit count identify the build without opening the jar, and the commit count is
+		// monotonic, which is what makes two builds of the same version distinguishable.
+		Files.copy(
+				path.resolve(String.format("build/libs/%s-%s%s.jar", loader, version, loader.equals("fabric") ? "" : "-all")),
+				directory.resolve(String.format("YYMTR-%s.%s+%s_%s.%s%s.jar",
+						shortLoaderName(), version, minecraftVersion, buildDate(), commitCount(),
+						excludeAssets ? "-server" : "")),
+				StandardCopyOption.REPLACE_EXISTING);
+	}
+
+	/** fab / for / neofor, so the jar name identifies the loader without spelling it out. */
+	private String shortLoaderName() {
+		switch (loader) {
+			case "fabric":
+				return "fab";
+			case "forge":
+				return "for";
+			case "neoforge":
+				return "neofor";
+			default:
+				return loader;
+		}
+	}
+
+	private static String buildDate() {
+		return new java.text.SimpleDateFormat("yyyy.MM.dd", java.util.Locale.ROOT).format(new java.util.Date());
+	}
+
+	/**
+	 * {@code git rev-list --count HEAD}, or {@code 0} when git is unavailable.
+	 *
+	 * <p>Never throws: a build from a source archive with no git metadata should still produce a
+	 * jar, with a zero in the field that identifies the build.</p>
+	 */
+	private String commitCount() {
+		try {
+			final Process process = new ProcessBuilder("git", "rev-list", "--count", "HEAD")
+					.directory(path.getParent().toFile())
+					.redirectErrorStream(true)
+					.start();
+			final String output;
+			try (java.io.BufferedReader reader = new java.io.BufferedReader(
+					new java.io.InputStreamReader(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+				output = reader.readLine();
+			}
+
+			if (process.waitFor() == 0 && output != null && output.trim().matches("\\d+")) {
+				return output.trim();
+			}
+		} catch (Exception ignored) {
+			// Fall through to the default.
+		}
+
+		return "0";
 	}
 
 	public void getPatreonList(String key) throws IOException {
