@@ -51,6 +51,16 @@ jobs:
             nf)  echo "deps=neoforge@*" >> $GITHUB_OUTPUT ;;
           esac
 
+      - name: Determine version type
+        id: vtype
+        if: steps.check.outputs.found == 'true'
+        run: |
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            echo "type=beta" >> $GITHUB_OUTPUT
+          else
+            echo "type=release" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish to Modrinth
         if: steps.check.outputs.found == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
@@ -60,7 +70,7 @@ jobs:
           files: "release-artifacts/YYMTR-${{ matrix.loader }}.*+${{ matrix.mc-version }}_*.jar"
           name: "${{ github.event.release.name }} (${{ matrix.mc-version }} ${{ steps.loader.outputs.name }})"
           version: "${{ github.event.release.tag_name }}-${{ matrix.mc-version }}-${{ steps.loader.outputs.name }}"
-          version-type: "release"
+          version-type: "${{ steps.vtype.outputs.type }}"
           changelog: "${{ github.event.release.body }}"
           loaders: "${{ steps.loader.outputs.name }}"
           game-versions: "${{ matrix.mc-version }}"
