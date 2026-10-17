@@ -12,9 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MTR-YanYang
+        # Full history: BuildTools names the release jar
+        # YYMTR-<loader>.<version>+<mc>_<date>.<commits>.jar with the count from
+        # `git rev-list --count HEAD`, which is 1 on a depth-1 checkout and would give
+        # every CI build the same non-monotonic count.
         uses: actions/checkout@v4
         with:
           path: Minecraft-Transit-Railway
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -49,9 +54,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MTR-YanYang
+        # Full history: BuildTools names the release jar
+        # YYMTR-<loader>.<version>+<mc>_<date>.<commits>.jar with the count from
+        # `git rev-list --count HEAD`, which is 1 on a depth-1 checkout and would give
+        # every CI build the same non-monotonic count.
         uses: actions/checkout@v4
         with:
           path: Minecraft-Transit-Railway
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
