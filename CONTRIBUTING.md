@@ -79,7 +79,7 @@ Java OBJ 批次列表的客户端集成检查和存储微基准：
 ./gradlew :fabric:runRenderBatchBenchmark -PmodLoader=fabric -PminecraftVersion=1.20.1
 ```
 
-客户端集成检查在 Fabric `preLaunch` 阶段验证实际 Mixin 和队列生命周期，不创建 GL 上下文，不能代替游戏画面、光影和资源重载验证。微基准只测批次存储，不代表完整渲染耗时或 FPS；测量方式见 [Java OBJ 批次优化记录](docs/performance/2026-10-23-java-obj-batches.md)。
+客户端集成检查在 Fabric `preLaunch` 阶段验证实际 Mixin 和队列生命周期，不创建 GL 上下文，不能代替游戏画面、光影和资源重载验证。微基准只测批次存储，不代表完整渲染耗时或 FPS；PR 中应说明测量范围和限制。
 
 检查 `fabric/build/test-results/test/` 中的执行、失败和跳过数量。因缺少运行环境而跳过的测试，不算验证通过。
 
