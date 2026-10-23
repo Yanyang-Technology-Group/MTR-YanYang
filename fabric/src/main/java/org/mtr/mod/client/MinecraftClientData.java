@@ -28,7 +28,7 @@ public final class MinecraftClientData extends ClientData {
 	public final ObjectArraySet<VehicleExtension> vehicles = new ObjectArraySet<>();
 	public final Long2ObjectAVLTreeMap<PersistentVehicleData> vehicleIdToPersistentVehicleData = new Long2ObjectAVLTreeMap<>();
 	public final Long2ObjectAVLTreeMap<LiftWrapper> liftWrapperList = new Long2ObjectAVLTreeMap<>();
-	public final Object2ObjectOpenHashMap<String, RailWrapper> railWrapperList = new Object2ObjectOpenHashMap<>();
+	public final Object2ObjectArrayMap<String, RailWrapper> railWrapperList = new HashBackedArrayMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToPreBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToCurrentlyBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final ObjectArraySet<String> blockedRailIds = new ObjectArraySet<>();
