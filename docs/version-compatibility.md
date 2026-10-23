@@ -24,6 +24,14 @@ On PowerShell, quote the entire property argument:
 
 `modLoader` accepts `fabric`, `forge`, or `all` (the default). Selecting Fabric avoids configuring Forge and downloading its unrelated build dependencies.
 
+## Legacy add-on field compatibility
+
+Fangsu 1.2.0 for Fabric 1.20.1 reads `MinecraftClientData.railWrapperList` using the field descriptor `Lorg/mtr/libraries/it/unimi/dsi/fastutil/objects/Object2ObjectArrayMap;`. Changing the declared field type to `Object2ObjectOpenHashMap` breaks that compiled access with `NoSuchFieldError`, even though the field name still exists.
+
+Keep the public field declared as `Object2ObjectArrayMap`. Its `HashBackedArrayMap` implementation delegates storage and live collection views to an `Object2ObjectOpenHashMap`, retaining hash-based lookups without a second rail cache.
+
+`MinecraftClientDataBinaryCompatibilityTest` exercises the exact legacy field and `values()` descriptors with generated add-on bytecode. Container tests cover view mutations, null values, default return values, cloning, serialization and lookup complexity. These checks establish compatibility for the reported field access, not full in-game validation of Fangsu. The supplied Fangsu artifact targets 1.20.1; MTR's 1.20.4 regression checks do not establish Fangsu support on 1.20.4.
+
 ## Remaining 1.21 migration work
 
 The Java toolchain selector now recognizes the Java 21 requirement from 1.20.5 onward. Loot-table generation selects the singular `loot_table` resource directory from 1.21 onward. These are preparatory changes, not a working 1.21 port.
