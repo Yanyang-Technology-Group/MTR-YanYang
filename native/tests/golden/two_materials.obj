@@ -1,0 +1,22 @@
+# Two material groups on one quad.
+#
+# `body#interior` selects CUTOUT_BRIGHT through legacyMapping and `glass#flipv=1`
+# selects CUTOUT with an explicit V flip. Both carry a map_Kd so the texture
+# resolver runs, and both carry a Kd so the colour packing is exercised.
+mtllib two_materials.mtl
+
+v -0.5 0.25 0
+v  0.5 0.25 0
+v  0.5 0.75 0
+v -0.5 0.75 0
+
+vt 0 0
+vt 1 0
+vt 1 1
+vt 0 1
+
+usemtl body#interior
+f 1/1 2/2 3/3 4/4
+
+usemtl glass#flipv=1
+f 4/4 3/3 2/2 1/1

@@ -1,0 +1,25 @@
+# Two triangles sharing an edge, with no `vn` statements.
+#
+# Every normal therefore comes from RawMesh.generateNormals, and because the shared
+# corners start with a zero normal they take the first face's normal. The
+# de-duplication in distinct() then merges corners that agree on position, normal
+# and UV - so the vertex count here is decided by the interaction of the two.
+#
+# The second triangle deliberately has a different winding from the first, which
+# gives it an opposing normal and keeps its corners distinct from the first
+# triangle's.
+
+v 0.0 0.0 0.0
+v 1.0 0.0 0.0
+v 1.0 1.0 0.0
+v 0.0 1.0 0.0
+
+vt 0.0 0.0
+vt 1.0 0.0
+vt 1.0 1.0
+vt 0.0 1.0
+
+usemtl sheet
+
+f 1/1 2/2 3/3
+f 1/1 3/3 4/4

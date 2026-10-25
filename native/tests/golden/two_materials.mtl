@@ -1,0 +1,14 @@
+# Material definitions for two_materials.obj.
+#
+# Kept intentionally awkward: `body#interior` has a Kd but no `d`, so the alpha has
+# to come from DefaultMtl's 1.0 default, and `glass#flipv=1` has a `d` of 0.5 which
+# truncates to 127 rather than rounding to 128.
+
+newmtl body#interior
+Kd 0.8 0.8 0.85
+map_Kd body.png
+
+newmtl glass#flipv=1
+Kd 0.4 0.6 0.9
+d 0.5
+map_Kd glass.png

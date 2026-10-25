@@ -52,6 +52,64 @@ tasks.named("processTestResources") {
 	inputs.property("serverOptimizationTest", project.hasProperty("serverOptimizationTest"))
 }
 
+// ---------------------------------------------------------------------------
+// Native OBJ pipeline resources
+// ---------------------------------------------------------------------------
+//
+// The mod loads a native library through org.mtr.mod.resource.nativeobj.NativeObjPipeline,
+// which looks it up at native/<os>-<arch>/ inside the jar. This stages whatever has been
+// placed in native/packaged/ so a normal build picks it up.
+//
+// The directory is optional on purpose: a checkout with no native build produces a jar
+// without the library, and the mod falls back to its original Java OBJ pipeline instead of
+// failing to load. That keeps the native side genuinely optional for contributors who only
+// work on the Java code.
+//
+// CI assembles native/packaged/ from the per-platform artifacts of
+// .github/workflows/native.yml. For a local release build, run
+// native/tools/build-native.ps1 and then stage the library under
+// native/packaged/<os>-<arch>/ yourself.
+
+final File packagedNatives = new File(project.rootDir, "native/packaged")
+
+tasks.register("copyNativeModelPipeline", Copy) {
+	description = "Stages native/packaged/ into the jar under native/<os>-<arch>/."
+	group = "build"
+
+	// Gradle validates a declared input directory eagerly, so a source that may legitimately
+	// be absent has to be tolerated by the copy itself rather than by onlyIf. An empty
+	// directory produces an empty copy, which is the "no native library" case the mod handles
+	// by falling back to its Java pipeline.
+	onlyIf { packagedNatives.isDirectory() }
+
+	// Fingerprinted after the skip check so a project without the directory does not fail
+	// configuration validation. inputs.dir does not accept .optional() from Groovy, which is
+	// what made the first version of this task fail with "an input file was expected to be
+	// present but it doesn't exist".
+	if (packagedNatives.isDirectory()) {
+		inputs.dir(packagedNatives)
+	}
+
+	from(packagedNatives)
+	into layout.buildDirectory.dir("generated/nativeResources/native")
+}
+
+sourceSets.main.resources.srcDir(layout.buildDirectory.dir("generated/nativeResources"))
+
+tasks.named("processResources") {
+	dependsOn("copyNativeModelPipeline")
+}
+
+// The staged natives are a task output rather than a checkout directory, and they sit on the main
+// resources path so the jar carries them. Every jar task that packages main sources or resources
+// therefore reads a file another task produces, and Gradle rejects that as an implicit dependency
+// unless the ordering is declared. processResources alone was not enough: sourcesJar fails the same
+// way. It only happens when native/packaged/ exists, which is the native workflow's build-mod job
+// and never the plain mod build, so it went unnoticed until natives were staged.
+tasks.withType(Jar).configureEach {
+	dependsOn("copyNativeModelPipeline")
+}
+
 if (project.hasProperty("serverOptimizationTest")) {
 	loom {
 		mods {
@@ -278,4 +336,21 @@ remapJar {
 test {
 	useJUnitPlatform()
 	testLogging { showStandardStreams = true }
+}
+
+// Writes the test runtime classpath to a file.
+//
+// The test worker cannot load the test classes through Gradle even though the classes are
+// compiled and the classpath provably contains their output directory, so the suite has to
+// be runnable outside Gradle to be diagnosable. This task is the only reliable way to obtain
+// the exact classpath Loom builds, which mixes the remapped Minecraft jar with the test
+// dependencies.
+tasks.register("dumpTestClasspath") {
+	description = "Writes the test runtime classpath to build/test-classpath.txt."
+	group = "help"
+	doLast {
+		final File out = new File(project.buildDir, "test-classpath.txt")
+		out.text = sourceSets.test.runtimeClasspath.asPath
+		logger.lifecycle("wrgl: wrote {} entries to {}", sourceSets.test.runtimeClasspath.files.size(), out)
+	}
 }

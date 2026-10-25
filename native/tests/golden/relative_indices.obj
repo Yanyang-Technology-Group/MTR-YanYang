@@ -1,0 +1,20 @@
+# A quad whose faces use negative, relative indices.
+#
+# `f -4 -3 -2 -1` resolves against the vertex count as it stands at that point in
+# the file, which is four, so the corners are 0, 1, 2, 3. The in-order face
+# statement right after it indexes the same vertices the same way, so a correct
+# implementation collapses the two duplicate triangles in distinct() and produces
+# exactly one triangle.
+#
+# This is the case that would catch an implementation resolving relative indices
+# against the final vertex count instead of the running one.
+
+v -1.0 0.0 -1.0
+v  1.0 0.0 -1.0
+v  1.0 0.0  1.0
+v -1.0 0.0  1.0
+
+usemtl ground
+
+f -4 -3 -2 -1
+f 1 2 3 4

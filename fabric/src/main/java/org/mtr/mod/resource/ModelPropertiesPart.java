@@ -172,7 +172,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 	}
 
 	public void writeCache(
-			Map<String, OptimizedModel.ObjModel> nameToObjModels,
+			Map<String, ? extends OptimizedObjModel> nameToObjModels,
 			PositionDefinitions positionDefinitionsObject,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>>> objModelsForPartConditionAndRenderStage,
 			Object2ObjectOpenHashMap<PartCondition, Object2ObjectOpenHashMap<RenderStage, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>>> objModelsForPartConditionAndRenderStageDoorsClosed,
@@ -183,7 +183,7 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 		final Supplier<OptimizedModelWrapper> optimizedModelDoor;
 
 		names.forEach(name -> {
-			final OptimizedModel.ObjModel objModel = nameToObjModels.get(name);
+			final OptimizedObjModel objModel = nameToObjModels.get(name);
 			if (objModel != null) {
 				// YanYang fix: each part must own an isolated copy of the model. addTransformation
 				// appends transformed mesh copies to the shared rawModel of the ObjModel instance,
@@ -192,12 +192,15 @@ public final class ModelPropertiesPart extends ModelPropertiesPartSchema impleme
 				// variant's transformations together and all of them render at once, regardless
 				// of the part condition — forward and flipped seats overlapping. A per-part copy
 				// keeps the accumulation local to this part's own condition bucket.
+				//
+				// The copy is also what gives the native backend its own staging builder, so the
+				// isolation holds there for the same reason.
 				objModels.add(new OptimizedModelWrapper.ObjModelWrapper(objModel.copy()));
 				mutableBox.add(new Box(-objModel.getMinX(), -objModel.getMinY(), -objModel.getMinZ(), -objModel.getMaxX(), -objModel.getMaxY(), -objModel.getMaxZ()));
 			}
 		});
 
-		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModels(objModels) : null;
+		optimizedModelDoor = () -> isDoor() ? OptimizedModelWrapper.fromObjModelWrappers(objModels) : null;
 
 		positionDefinitions.forEach(positionDefinitionName -> positionDefinitionsObject.getPositionDefinition(positionDefinitionName, (positions, positionsFlipped) -> {
 			if (type == PartType.NORMAL) {

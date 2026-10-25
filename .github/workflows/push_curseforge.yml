@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag whose assets should be published
+        required: true
+        type: string
 
 jobs:
   publish-curseforge:
@@ -14,18 +19,28 @@ jobs:
         loader: [ "fab", "for", "nf" ]
         mc-version: [ "1.20.1", "1.20.4", "1.21.1", "1.21.4" ]
     steps:
+      - name: Resolve artifact loader
+        id: asset
+        run: |
+          case "${{ matrix.loader }}" in
+            nf) echo "name=neofor" >> "$GITHUB_OUTPUT" ;;
+            *)  echo "name=${{ matrix.loader }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: Download Release Assets
         uses: robinraju/release-downloader@v1
         with:
           repository: ${{ github.repository }}
-          tag: ${{ github.event.release.tag_name }}
-          fileName: "YYMTR-${{ matrix.loader }}.*+${{ matrix.mc-version }}_*.jar"
+          tag: ${{ github.event.release.tag_name || inputs.release_tag }}
+          fileName: "YYMTR-${{ steps.asset.outputs.name }}.*+${{ matrix.mc-version }}_*.jar"
           out-file-path: "release-artifacts"
 
       - name: Check file exists
         id: check
         run: |
-          if ls release-artifacts/YYMTR-${{ matrix.loader }}.*+${{ matrix.mc-version }}_*.jar 1> /dev/null 2>&1; then
+          if find release-artifacts -maxdepth 1 -type f \
+            -name "YYMTR-${{ steps.asset.outputs.name }}.*+${{ matrix.mc-version }}_*.jar" \
+            ! -name '*-server.jar' -print -quit | grep -q .; then
             echo "found=true" >> $GITHUB_OUTPUT
           else
             echo "found=false" >> $GITHUB_OUTPUT
@@ -35,9 +50,26 @@ jobs:
         id: resolve
         if: steps.check.outputs.found == 'true'
         run: |
-          FILE=$(ls release-artifacts/YYMTR-${{ matrix.loader }}.*+${{ matrix.mc-version }}_*.jar | head -n 1)
+          FILE=$(find release-artifacts -maxdepth 1 -type f \
+            -name "YYMTR-${{ steps.asset.outputs.name }}.*+${{ matrix.mc-version }}_*.jar" \
+            ! -name '*-server.jar' | sort | head -n 1)
+          if [ -z "$FILE" ]; then
+            echo "No client jar found for ${{ matrix.loader }} / ${{ matrix.mc-version }}" >&2
+            exit 1
+          fi
+
+          FILE_NAME=${FILE##*/}
+          if [[ "$FILE_NAME" =~ ^YYMTR-${{ steps.asset.outputs.name }}\.([^+]+)\+([^_]+)_([0-9]{4}\.[0-9]{2}\.[0-9]{2})\.([0-9]+)\.jar$ ]] \
+            && [[ "${BASH_REMATCH[2]}" == "${{ matrix.mc-version }}" ]]; then
+            VERSION="${{ matrix.loader }}_${BASH_REMATCH[2]}+${BASH_REMATCH[1]}-${BASH_REMATCH[4]}"
+          else
+            echo "Unexpected release asset filename: $FILE_NAME" >&2
+            exit 1
+          fi
           echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Resolved file: $FILE"
+          echo "Resolved version: $VERSION"
 
       - name: Map loader to CurseForge name
         id: loader
@@ -79,7 +111,7 @@ jobs:
           file_path: "${{ steps.resolve.outputs.file }}"
           game_versions: "Minecraft ${{ matrix.mc-version }},${{ steps.loader.outputs.name }}"
           release_type: "${{ steps.rtype.outputs.type }}"
-          display_name: "${{ github.event.release.name }} (${{ matrix.mc-version }} ${{ steps.loader.outputs.name }})"
+          display_name: "${{ steps.resolve.outputs.version }}"
           changelog: "${{ github.event.release.body }}"
           changelog_type: "markdown"
           relations: "${{ steps.deps.outputs.relations }}"

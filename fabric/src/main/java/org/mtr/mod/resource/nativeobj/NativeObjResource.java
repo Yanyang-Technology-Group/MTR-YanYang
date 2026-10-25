@@ -1,0 +1,260 @@
+package org.mtr.mod.resource.nativeobj;
+
+import org.apache.commons.lang3.StringUtils;
+import org.mtr.mapping.holder.Identifier;
+import org.mtr.mod.Init;
+import org.mtr.mod.resource.CustomResourceTools;
+import org.mtr.mod.resource.ResourceProvider;
+
+import javax.annotation.Nullable;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * The boundary between MTR's resource layer and the native OBJ pipeline.
+ *
+ * <p>Everything the native side cannot know lives here: which identifier a texture string
+ * resolves to, where the MTL file is, and whether the whole thing is even available. The
+ * native library only ever sees bytes and opaque integers.</p>
+ *
+ * <h2>Why the texture table is built before the geometry</h2>
+ *
+ * <p>{@code ObjModelLoader} folds the material group name, the MTL's {@code map_Kd} and three
+ * separate resolution rules into one texture identity. Rather than duplicate that logic, the
+ * native parser runs it and reports the resulting texture string per material group; Java
+ * then applies MTR's own resolution to each string. The strings are identical to the ones the
+ * Java path would have computed, so the resulting texture is too, and the native side never
+ * needs to know what an {@link Identifier} is.</p>
+ *
+ * <h2>Failure handling</h2>
+ *
+ * <p>Every method returns null instead of throwing when anything is missing. A model that the
+ * native parser cannot handle, a library that failed to load, a resource pack that broke its
+ * MTL - all of them leave the caller to use the original Java pipeline, which is still
+ * present and untouched.</p>
+ */
+public final class NativeObjResource {
+
+	private NativeObjResource() {
+	}
+
+	/** True when the native library loaded and passed the ABI check. */
+	public static boolean isAvailable() {
+		return NativeObjPipeline.isAvailable();
+	}
+
+	/** A description of the load outcome, for logs. */
+	public static String getStatusMessage() {
+		return NativeObjPipeline.getStatusMessage();
+	}
+
+	/** A summary of the work performed so far. */
+	public static String getStatistics() {
+		return NativeObjPipeline.getStatistics();
+	}
+
+	/** The native library's own version string, or null when it is not loaded. */
+	@Nullable
+	public static String getNativeVersion() {
+		return NativeObjPipeline.getNativeVersion();
+	}
+
+	/**
+	 * Every asset this model can reference, in a stable order.
+	 *
+	 * <p>The OBJ itself, every MTL its header names, and the PNG that resolves the same way the
+	 * loader would resolve a texture name. Collecting them up front gives the resource provider
+	 * one complete list to prepare, which matters because reading an asset that was never
+	 * prepared yields an empty string rather than a failure and would silently produce an
+	 * untextured model.</p>
+	 */
+	@Nullable
+	public static List<Identifier> collectIdentifiers(String modelResource) {
+		if (!isAvailable() || StringUtils.isEmpty(modelResource)) {
+			return null;
+		}
+		try {
+			final List<Identifier> identifiers = new ArrayList<>();
+			addIfAbsent(identifiers, CustomResourceTools.formatIdentifierWithDefault(modelResource, "obj"));
+			// Same-path resolution with the model's own extension is what the loader does for a
+			// texture that carries no explicit path, so the PNG next to the OBJ is included.
+			addIfAbsent(identifiers, CustomResourceTools.getResourceFromSamePath(modelResource, modelResource, "png"));
+			return identifiers;
+		} catch (Throwable throwable) {
+			Init.LOGGER.warn("[wrobj] could not enumerate the resources of {}: {}",
+					modelResource, throwable.toString());
+			return null;
+		}
+	}
+
+	/**
+	 * Builds a native model for the given OBJ resource.
+	 *
+	 * @param modelResource the resource path recorded in the vehicle or object JSON
+	 * @param vehicleTexture the vehicle's own texture, used when a material says
+	 *                       {@code default.png}
+	 * @param flipTextureV  whether the model definition asked for a V flip
+	 * @param resourceProvider reads resources
+	 * @return the model, or null when the native path cannot be used
+	 */
+	@Nullable
+	public static NativeObjModel load(String modelResource, Identifier vehicleTexture, boolean flipTextureV,
+			ResourceProvider resourceProvider) {
+		if (!isAvailable()) {
+			return null;
+		}
+
+		final Identifier objIdentifier = CustomResourceTools.formatIdentifierWithDefault(modelResource, "obj");
+		final byte[] objBytes = readBytes(resourceProvider, objIdentifier);
+		if (objBytes.length == 0) {
+			Init.LOGGER.warn("[wrobj] {} could not be read, falling back to the Java OBJ pipeline",
+					objIdentifier);
+			return null;
+		}
+
+		final String objHeader = new String(objBytes, StandardCharsets.UTF_8);
+		final byte[] mtlBytes = readMtl(resourceProvider, modelResource, objHeader);
+
+		return build(objBytes, mtlBytes, modelResource, vehicleTexture, flipTextureV);
+	}
+
+	/**
+	 * Builds a native model from OBJ bytes that are already in memory.
+	 *
+	 * <p>Used by the MQO path, where the OBJ is generated by {@code MqoModelConverter} rather
+	 * than read from a resource.</p>
+	 */
+	@Nullable
+	public static NativeObjModel buildFromContent(String objContent, @Nullable String mtlContent,
+			String modelResource, Identifier vehicleTexture, boolean flipTextureV) {
+		if (!isAvailable() || StringUtils.isEmpty(objContent)) {
+			return null;
+		}
+		return build(objContent.getBytes(StandardCharsets.UTF_8),
+				mtlContent == null ? null : mtlContent.getBytes(StandardCharsets.UTF_8),
+				modelResource, vehicleTexture, flipTextureV);
+	}
+
+	// -----------------------------------------------------------------------
+	// Implementation
+	// -----------------------------------------------------------------------
+
+	@Nullable
+	private static NativeObjModel build(byte[] objBytes, @Nullable byte[] mtlBytes, String modelResource,
+			Identifier vehicleTexture, boolean flipTextureV) {
+		final boolean materialGroupTextures = mtlBytes != null && mtlBytes.length > 0;
+
+		final NativeObjKey[] keys = NativeObjPipeline.loadKeys(objBytes, mtlBytes, flipTextureV);
+		if (keys == null || keys.length == 0) {
+			return null;
+		}
+
+		// Resolve each key's texture once. The result is indexed by key, and that index is the
+		// handle the native side compares, so two keys that resolve to the same Identifier
+		// still count as the same material, exactly as MaterialProperties would.
+		final Identifier[] textures = new Identifier[keys.length];
+		final String[] lookupKeys = new String[keys.length];
+		for (int i = 0; i < keys.length; i++) {
+			textures[i] = resolveTexture(keys[i].textureString, modelResource, vehicleTexture);
+			lookupKeys[i] = keys[i].textureString + '\u0000' + keys[i].shaderType;
+		}
+
+		try {
+			return new NativeObjModel(keys, lookupKeys, textures, materialGroupTextures,
+					flipTextureV, objBytes, mtlBytes);
+		} catch (Throwable throwable) {
+			Init.LOGGER.warn("[wrobj] could not create a native model for {}: {}",
+					modelResource, throwable.toString());
+			return null;
+		}
+	}
+
+	/**
+	 * Applies MTR's own texture resolution to a string the native parser produced.
+	 *
+	 * <p>Mirrors the lambda {@code ModelResourceLoader} passes into
+	 * {@code ObjModel.ObjModel.loadModel}: nothing becomes the white texture, {@code
+	 * default.png} becomes the vehicle's texture, and anything else resolves next to the OBJ
+	 * with a PNG extension.</p>
+	 */
+	private static Identifier resolveTexture(String textureString, String modelResource, Identifier vehicleTexture) {
+		if (StringUtils.isEmpty(textureString)) {
+			return org.mtr.mod.resource.OptimizedModelWrapper.WHITE_TEXTURE;
+		}
+		if (StringUtils.equals(textureString, "default.png")) {
+			return vehicleTexture;
+		}
+		return CustomResourceTools.getResourceFromSamePath(modelResource, textureString, "png");
+	}
+
+	/**
+	 * Reads the MTL the OBJ header names, if any.
+	 *
+	 * <p>The reference implementation keeps only the last {@code mtllib} statement and only
+	 * ever one of them, so scanning for the last occurrence reproduces that. A missing or
+	 * unreadable MTL is not an error: the loader's "no materials" branch is a legitimate
+	 * model, and the native side takes it when this returns null.</p>
+	 */
+	@Nullable
+	private static byte[] readMtl(ResourceProvider resourceProvider, String modelResource, String objHeader) {
+		final String mtlName = findLastMtlLib(objHeader);
+		if (StringUtils.isEmpty(mtlName)) {
+			return null;
+		}
+		try {
+			final Identifier mtlIdentifier = CustomResourceTools.getResourceFromSamePath(
+					modelResource, mtlName.replace("\\\\", "/").replace("\\", "/"), "mtl");
+			final byte[] bytes = readBytes(resourceProvider, mtlIdentifier);
+			if (bytes.length == 0) {
+				Init.LOGGER.warn("[wrobj] the MTL {} could not be read; the model will load untextured",
+						mtlIdentifier);
+				return null;
+			}
+			return bytes;
+		} catch (Throwable throwable) {
+			Init.LOGGER.warn("[wrobj] could not resolve the MTL of {}: {}", modelResource,
+					throwable.toString());
+			return null;
+		}
+	}
+
+	/**
+	 * The argument of the last {@code mtllib} statement, or an empty string.
+	 *
+	 * <p>Deliberately a plain scan rather than a parser: the native side parses the document
+	 * properly, and this only needs to locate a file name.</p>
+	 *
+	 * <p>Public because {@code ModelResourceLoader} is in a different package and needs the
+	 * same answer to resolve the MTL that the native builder will use.</p>
+	 */
+	public static String findLastMtlLib(String objHeader) {
+		String result = "";
+		for (final String rawLine : objHeader.split("\r\n|\r|\n")) {
+			final String line = rawLine.trim();
+			if (line.length() > 6 && line.regionMatches(true, 0, "mtllib", 0, 6)) {
+				// ObjReader uses line.substring(6).trim(), so a tab after the keyword is kept
+				// only up to the trim.
+				result = line.substring(6).trim();
+			}
+		}
+		return result;
+	}
+
+	private static byte[] readBytes(ResourceProvider resourceProvider, Identifier identifier) {
+		try {
+			final byte[] bytes = resourceProvider.getBytes(identifier);
+			return bytes == null ? new byte[0] : bytes;
+		} catch (Throwable throwable) {
+			// The resource provider reports a missing asset by failing, so this is a normal
+			// outcome rather than an error worth logging at a higher level.
+			return new byte[0];
+		}
+	}
+
+	private static void addIfAbsent(List<Identifier> identifiers, Identifier identifier) {
+		if (identifier != null && !identifiers.contains(identifier)) {
+			identifiers.add(identifier);
+		}
+	}
+}

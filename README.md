@@ -22,6 +22,15 @@ MTR-YanYang 是 [Minecraft Transit Railway（MTR）](https://github.com/Minecraf
 | 服务端轨道同步 | 用轨道空间索引和玩家可见性缓存减少全路网与玩家的重复扫描，保留每 tick 的客户端更新与原有模拟顺序。 |
 | 车辆占用查询 | 将占用轨道端点对映射为整数 ID，用 primitive 数组记录区间并复用前后 tick 缓冲，保留实时写读、方向与自身车辆排除规则。 |
 | 信号闭塞区 | 缓存同色轨道的连通成员，替代每次预留的重复递归；拓扑或颜色变化后重算，通行检查仍读取四个实时预留窗口。 |
+| OBJ 模型渲染（C++ 原生） | 将 OBJ/MTL 解析、分组拆分、逐顶点可渲染化、模型与摆位变换、法线生成、顶点去重以及交错顶点/索引缓冲打包整条 CPU 链路改由 C++ 实现，缓冲直接在原生内存中生成并按地址上传；与原 Java 管线逐字节等价，缺少原生库时自动回退。详见 [native/README.md](native/README.md)。 |
+
+### OBJ 模型渲染的 C++ 原生实现
+
+MTR 的优化渲染路径（列车默认渲染路径）原先在 Java 侧完成全部模型预处理：每个可渲染顶点生成一个 `Vertex` 对象和两个 `Vector3f` 包装对象，`generateNormals` 会再整体复制一遍顶点，每个车辆部件摆位又会复制一次网格，去重依赖以装箱对象为键的 `HashMap`，最终交错顶点缓冲还要在 Java 堆上分配后再交给 `glBufferData`。大型追加包一次重载会产生数千万个短命对象。
+
+本分支将这条链路整体改写为 C++（`native/`），保留原有算法、顶点顺序、面顺序、去重顺序与浮点舍入，因此**显存中的缓冲区与 Java 实现逐字节一致**，可在 `native/tests` 的纯原生金标准比对和 `fabric/src/test` 的 JVM 侧等价性测试中验证。以本仓库自带的 `teapot.obj`（540 KB、13,209 三角形）为例，8 次摆位约 81 ms、40 次摆位约 370 ms，吞吐约 1.3–1.4 M 顶点/秒；同规模下原 Java 管线预计需要分配约 11 MiB / 59 MiB 的堆内存。
+
+原生库完全可选：未构建、ABI 不匹配、或某个模型无法解析时，均记录日志并回退到原有 Java 管线，不会导致游戏无法启动。
 
 实际收益取决于线路规模、模型复杂度、硬件和模组组合，不承诺固定 FPS 或 TPS 增幅。
 
@@ -60,6 +69,33 @@ MTR-YanYang 是 [Minecraft Transit Railway（MTR）](https://github.com/Minecraf
 ```
 
 增加 `-PcomputeBenchmark` 可在同一隔离进程中运行车辆与信号的合成基准，交替测量原 AVL/递归路径与优化路径的耗时、分配量；这些结果不代表实际服务器 TPS。
+
+原生 OBJ 管线独立于 Gradle 构建与测试，只需要 C++17 编译器和 CMake；缺少它们时模组仍可正常构建，只是不带原生库：
+
+```sh
+# Linux / macOS
+cmake -S native -B native/build -DCMAKE_BUILD_TYPE=Release
+cmake --build native/build --parallel
+ctest --test-dir native/build --output-on-failure
+
+# Windows
+pwsh -File native/tools/build-native.ps1
+```
+
+`find_package(JNI)` 会遵循 `JAVA_HOME`；没有 JDK 时只跳过 JNI 共享库，核心库与测试仍可构建运行。发布包中的原生库来自 `.github/workflows/native.yml` 的四平台产物，放在 `native/packaged/<os>-<arch>/` 后由 `:fabric:processResources` 打进 jar。不放置该目录时构建出的 jar 不含原生库，模组会自动回退到 Java 管线。
+
+不依赖 Gradle 的快速检查：
+
+```sh
+# 用开发版映射 jar 对原生接入层做类型检查；加 -RunSmokeTest 会真正加载 DLL 跑一轮
+pwsh -File native/tools/check-java-integration.ps1 -RunSmokeTest
+```
+
+`fabric/src/test` 中的等价性测试需要 Loom 重映射后的完整 Minecraft 类路径，因此只能在 Gradle 测试环境中运行：
+
+```sh
+./gradlew :fabric:test --tests '*NativeObj*' -PmodLoader=fabric -PminecraftVersion=1.20.1
+```
 
 ### 优化提交索引
 

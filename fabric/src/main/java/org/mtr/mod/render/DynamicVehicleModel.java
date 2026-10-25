@@ -69,7 +69,7 @@ public final class DynamicVehicleModel extends EntityModelExtension<EntityAbstra
 		testDoors(id);
 	}
 
-	public DynamicVehicleModel(Object2ObjectAVLTreeMap<String, OptimizedModel.ObjModel> nameToObjModels, Identifier texture, ModelProperties modelProperties, PositionDefinitions positionDefinitions, String id) {
+	public DynamicVehicleModel(Object2ObjectAVLTreeMap<String, OptimizedObjModel> nameToObjModels, Identifier texture, ModelProperties modelProperties, PositionDefinitions positionDefinitions, String id) {
 		super(0, 0);
 		buildModel();
 		modelProperties.addPartsIfEmpty(nameToObjModels.keySet());

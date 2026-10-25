@@ -1,0 +1,93 @@
+# A cube with 24 vertices and 24 texcoords, so every geometric corner appears in
+# three faces with three different UVs.
+#
+# This is the case that pins ObjUtils.makeTexCoordsUnique. The reference
+# implementation keeps one "used texcoord" slot per *vertex index*: the first face
+# to touch a vertex pins its texcoord, and any later face that needs a different
+# texcoord for the same vertex forks a copy of the vertex. Because the vertex
+# buffer is uploaded in the order that produces, a different fork order shows up
+# as a byte difference even when the rendered cube is identical.
+#
+# Vertex layout, so the seam structure is readable:
+#   1-4   z = -0.5 face, UVs of the -Z side
+#   5-8   z = +0.5 face, UVs of the +Z side
+#   9-12  y = -0.5 face, UVs of the -Y side
+#   13-16 y = +0.5 face, UVs of the +Y side
+#   17-20 x = -0.5 face, UVs of the -X side
+#   21-24 x = +0.5 face, UVs of the +X side
+
+v -0.5 -0.5 -0.5
+v  0.5 -0.5 -0.5
+v  0.5  0.5 -0.5
+v -0.5  0.5 -0.5
+
+v -0.5 -0.5  0.5
+v  0.5 -0.5  0.5
+v  0.5  0.5  0.5
+v -0.5  0.5  0.5
+
+v -0.5 -0.5 -0.5
+v  0.5 -0.5 -0.5
+v  0.5 -0.5  0.5
+v -0.5 -0.5  0.5
+
+v -0.5  0.5 -0.5
+v  0.5  0.5 -0.5
+v  0.5  0.5  0.5
+v -0.5  0.5  0.5
+
+v -0.5 -0.5 -0.5
+v -0.5  0.5 -0.5
+v -0.5  0.5  0.5
+v -0.5 -0.5  0.5
+
+v  0.5 -0.5 -0.5
+v  0.5  0.5 -0.5
+v  0.5  0.5  0.5
+v  0.5 -0.5  0.5
+
+# Six distinct UV rectangles, 0.0-0.25, 0.25-0.5, ..., so no two faces share UVs.
+vt 0.00 0.00
+vt 0.25 0.00
+vt 0.25 0.25
+vt 0.00 0.25
+
+vt 0.25 0.00
+vt 0.50 0.00
+vt 0.50 0.25
+vt 0.25 0.25
+
+vt 0.50 0.00
+vt 0.75 0.00
+vt 0.75 0.25
+vt 0.50 0.25
+
+vt 0.75 0.00
+vt 1.00 0.00
+vt 1.00 0.25
+vt 0.75 0.25
+
+vt 0.00 0.25
+vt 0.25 0.25
+vt 0.25 0.50
+vt 0.00 0.50
+
+vt 0.25 0.25
+vt 0.50 0.25
+vt 0.50 0.50
+vt 0.25 0.50
+
+usemtl cube
+
+# -Z
+f 1/1 2/2 3/3 4/4
+# +Z
+f 8/5 7/6 6/7 5/8
+# -Y
+f 9/9 10/10 11/11 12/12
+# +Y
+f 16/13 15/14 14/15 13/16
+# -X
+f 17/17 18/18 19/19 20/20
+# +X
+f 24/21 23/22 22/23 21/24

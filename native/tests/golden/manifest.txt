@@ -1,0 +1,124 @@
+# SPDX-License-Identifier: MIT
+#
+# Reference forms for the native OBJ pipeline equivalence harness.
+#
+# Every file here is deliberately tiny and hand-checkable, but each one exercises a
+# decision point that the native rewrite has to reproduce exactly. The goldens are
+# produced by native/tools/GenerateGolden.java from the real RawMesh / ObjUtils /
+# javagl code, then compared byte for byte against native output.
+
+# --- A quad, nothing else -------------------------------------------------
+# ObjSplitting by group and by material group both land on the implicit "default"
+# entry, and convertToRenderable has to fan the quad into two triangles. The
+# material group name is the empty string, which is the key the host resolves to
+# its fallback texture.
+case basic-quad
+obj basic_quad.obj
+transform 0,0,0,0,0
+end
+
+# --- Two material groups, one with a shader override ---------------------
+# Covers splitByMaterialGroups ordering, legacyMapping's string table, map_Kd
+# resolution, and the Kd/d colour packing. The second group also exercises the
+# `flipv=1` option, which flips V per material group rather than per model.
+case two-materials
+obj two_materials.obj
+mtl two_materials.mtl
+transform 0,0,0,0,0
+end
+
+# --- Per-vertex UV seams -------------------------------------------------
+# A cube with 24 vertices and 24 UVs where each corner is shared by three faces
+# with three different UVs. This is the case that pins makeTexCoordsUnique: the
+# reference implementation forks a vertex per distinct (vertex, texcoord) pair
+# before collapsing, so getting the order wrong changes the vertex buffer.
+case uv-seams
+obj uv_seams.obj
+transform 0,0,0,0,0
+end
+
+# --- Smooth normals from geometry ---------------------------------------
+# No vn statements at all, so every normal comes from generateNormals. Two
+# triangles share an edge, which means the de-duplication in distinct() has to
+# merge the shared corners after the normals are generated.
+case generated-normals
+obj generated_normals.obj
+transform 0,0,0,0,0
+end
+
+# --- Placements, flips and shader overrides ------------------------------
+# One source model placed four times: twice as CUTOUT, once as CUTOUT_BRIGHT and
+# once as TRANSLUCENT, alternating the flipped variant. Covers
+# ObjModel.addTransformation's copy-and-override rule, the Y-180 rotation applied
+# after the translation, and RawModel's merge by MaterialProperties: the two
+# CUTOUT placements merge into one bucket while the other two stay separate.
+case placements
+obj two_materials.obj
+mtl two_materials.mtl
+flipTextureV 1
+transform 0,0,0,0,0
+transform 0,1,0,0,1
+transform 2,0.5,0,-1,0
+transform 1,0,0,0,0
+end
+
+# --- Negative and relative face indices ---------------------------------
+# `f -4 -3 -2 -1` resolves against the vertex count at that point in the file, and
+# the quad fans into two triangles of a winding opposite to basic-quad.
+case relative-indices
+obj relative_indices.obj
+transform 0,0,0,0,0
+end
+
+# --- Material group names without an MTL --------------------------------
+# No mtllib statement, so ObjModelLoader takes its "no materials" branch: the
+# material group name becomes the texture string. One group is named "_", which
+# means "no texture" and must resolve to the fallback.
+case group-name-textures
+obj group_name_textures.obj
+materialGroupTextures 0
+transform 0,0,0,0,0
+end
+
+# --- Vehicle-level transform before placement ---------------------------
+# StoredModelResourceBase.transform applies ObjectResource's translation, rotation,
+# scale and mirror to the shared source meshes before any placement is added. A
+# non-uniform scale also exercises the inverse-transpose normal correction in
+# RawMesh.applyScale, and the mirror exercises the winding parity rule.
+case schema-transform
+obj two_materials.obj
+mtl two_materials.mtl
+schemaTranslation 0.25,0,0
+schemaRotation 90,0,0
+schemaScale 2,1,1
+schemaMirror 1,0,0
+transform 0,0,0,0,0
+end
+
+# --- Model-level scale with a negative component ------------------------
+# ObjectResource also carries a model-level transform, applied to the ObjModel before the
+# vehicle-level one. A non-uniform scale is the case that decides whether the
+# inverse-transpose normal correction in RawMesh.applyScale is reproduced, and a negative
+# component additionally flips the face winding, which is the other branch of applyScale.
+#
+# The model is rotated first so its normals mix all three axes: a normal of (0,0,1) would be
+# invariant under a scale in x and y and the correction would go untested.
+case model-scale-negative
+obj two_materials.obj
+mtl two_materials.mtl
+modelRotation 30,45,0
+modelScale 4,0.5,-1
+transform 0,0,0,0,0
+transform 0,0,0,0.5,1
+end
+
+# --- Model-level scale, all components positive -------------------------
+# The same normal correction with the winding left alone, plus a model-level translation so
+# the order of the two model-level operations is pinned as well.
+case model-scale-positive
+obj two_materials.obj
+mtl two_materials.mtl
+modelScale 3,1,0.25
+modelTranslation -0.5,0,0.25
+transform 0,0,0,0,0
+end

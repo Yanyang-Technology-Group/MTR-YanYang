@@ -1,0 +1,29 @@
+# No `mtllib` statement at all, so ObjModelLoader takes its "no materials" branch
+# and the material group name doubles as the texture string.
+#
+#   `panel`  resolves to a texture next to the model
+#   `_`      is the explicit "no texture" marker and must become the fallback
+#   default  is the implicit group for faces before the first `usemtl`
+#
+# The last group is named with a shader option but no material, which checks that
+# the option parsing happens on the group name in this branch too.
+
+v 0.0 0.0 0.0
+v 1.0 0.0 0.0
+v 1.0 1.0 0.0
+
+v 2.0 0.0 0.0
+v 3.0 0.0 0.0
+v 3.0 1.0 0.0
+
+v 4.0 0.0 0.0
+v 5.0 0.0 0.0
+v 5.0 1.0 0.0
+
+f 1 2 3
+
+usemtl panel
+f 4 5 6
+
+usemtl _
+f 7 8 9

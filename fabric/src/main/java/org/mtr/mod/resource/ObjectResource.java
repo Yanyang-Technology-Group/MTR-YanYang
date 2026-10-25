@@ -38,7 +38,7 @@ public final class ObjectResource extends ObjectResourceSchema implements Stored
 	}
 
 	@Override
-	public void transform(ObjectCollection<OptimizedModel.ObjModel> values) {
+	public void transform(ObjectCollection<? extends OptimizedObjModel> values) {
 		values.forEach(objModel -> {
 			objModel.applyTranslation(translation.getX(), translation.getY(), translation.getZ());
 			objModel.applyRotation(rotation.getX(), rotation.getY(), rotation.getZ());

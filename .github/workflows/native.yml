@@ -1,0 +1,417 @@
+# SPDX-License-Identifier: MIT
+#
+# Builds and tests the native OBJ pipeline on every supported platform, then builds the
+# mod with the resulting libraries packaged in, so the Gradle build is verified against
+# the real native artifacts rather than against a checkout without them.
+#
+# The native module is deliberately independent of Gradle and of the JVM: it needs only a
+# C++17 compiler and CMake. That makes the native half of this workflow cheap and makes the
+# equivalence tests runnable without downloading Minecraft.
+#
+# Two things are produced per platform:
+#   * a test result, so a regression fails here rather than in game;
+#   * the shared library, which process-natives lays out for the mod jar under
+#     native/<os>-<arch>/ - the path NativeObjPipeline looks in.
+
+name: Native OBJ pipeline
+
+on:
+  push:
+    branches: [ '1.20.x' ]
+    paths:
+      - 'native/**'
+      - 'fabric/build.gradle'
+      - '.github/workflows/native.yml'
+  pull_request:
+    branches: [ '1.20.x' ]
+    paths:
+      - 'native/**'
+      - 'fabric/build.gradle'
+      - '.github/workflows/native.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            platform: windows-x64
+            library: wrobj.dll
+            artifact: wrobj-windows-x64
+            tests: 'ON'
+            extra: ''
+          - name: linux-x64
+            os: ubuntu-latest
+            platform: linux-x64
+            library: wrobj.so
+            artifact: wrobj-linux-x64
+            tests: 'ON'
+            extra: ''
+          - name: macos-arm64
+            os: macos-14
+            platform: macos-arm64
+            library: wrobj.dylib
+            artifact: wrobj-macos-arm64
+            tests: 'ON'
+            extra: ''
+          # macOS x64 is deliberately not built. The arm64 build covers Apple Silicon, and an
+          # Intel Mac has no native library in the jar and falls back to the Java pipeline,
+          # which is the same graceful path every unsupported platform takes.
+          #
+          # iOS and iPadOS are one build. Apple compiles iPad apps against the iOS platform,
+          # so there is no iPadOS SDK and no separate Mach-O platform identifier; the same
+          # iphoneos arm64 binary loads on both. Both rows exist so that a device the mod's
+          # detection labels either way still finds a library.
+          #
+          # Tests are OFF here: the suites are executables and a cross-compiled arm64 iOS
+          # executable cannot run on the build machine. What this checks is that the library
+          # compiles and links for the device, which is the part never exercised before.
+          - name: ios-arm64
+            os: macos-14
+            platform: ios-arm64
+            library: wrobj.dylib
+            artifact: wrobj-ios-arm64
+            tests: 'OFF'
+            extra: '-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DCMAKE_OSX_SYSROOT=iphoneos'
+          - name: ipados-arm64
+            os: macos-14
+            platform: ipados-arm64
+            library: wrobj.dylib
+            artifact: wrobj-ipados-arm64
+            tests: 'OFF'
+            extra: '-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DCMAKE_OSX_SYSROOT=iphoneos'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Configure
+        # The output is written to a file as well as to the console, because the Actions log for
+        # a failed job needs an authenticated token to read while an artifact does not. The
+        # JNI discovery reports which JDK root it used, and that line is the one that matters
+        # when the shared library turns out to be missing.
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DWROBJ_BUILD_TESTS=${{ matrix.tests }} \
+            ${{ matrix.extra }} 2>&1 | tee native-configure.log
+          grep -E "wrobj:|JNI" native-configure.log || true
+
+      - name: Collect the diagnostic
+        # Always runs, so it is present even when the build or the verification fails.
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "platform: ${{ matrix.name }}"
+            echo "expected library: native/build/${{ matrix.library }}"
+            echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+            echo
+            echo "--- cmake configure log ---"
+            cat native-configure.log 2>/dev/null || echo "(no configure log)"
+            echo
+            echo "--- java ---"
+            command -v java && java -version 2>&1 | head -n 3
+            echo
+            echo "--- jni.h locations ---"
+            for dir in "${JAVA_HOME:-/nonexistent}/include" "${JAVA_HOME:-/nonexistent}/include/darwin" \
+                       "${JAVA_HOME:-/nonexistent}/include/linux"; do
+              [ -f "$dir/jni.h" ] && echo "FOUND $dir"
+            done
+            ls -d /usr/lib/jvm/* 2>/dev/null
+            echo
+            echo "--- build root ---"
+            ls -la native/build 2>&1 | head -n 40
+            echo
+            echo "--- anything named wrobj ---"
+            find native/build -name '*wrobj*' 2>/dev/null | head -n 20
+          } > "native-diagnostic-${{ matrix.platform }}.txt" 2>&1
+          cat "native-diagnostic-${{ matrix.platform }}.txt"
+
+      - name: Upload the diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-diagnostic-${{ matrix.platform }}
+          path: native-diagnostic-${{ matrix.platform }}.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Build
+        run: cmake --build native/build --config Release --parallel
+
+      - name: Test
+        # Both suites are pure native and need no GL context: the model pipeline suite and
+        # the draw list suite, the latter against a recording stub in place of a driver.
+        run: ctest --test-dir native/build --build-config Release --output-on-failure
+
+      - name: Run the test binaries directly
+        # ctest hides the assertion counts, and those counts are the useful signal when a
+        # change quietly stops exercising a case.
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in $(find native/build -type f \( -name 'wrobj_tests' -o -name 'wrobj_tests.exe' \
+              -o -name 'wrgl_tests' -o -name 'wrgl_tests.exe' \) -perm -u+x); do
+            echo "=== $binary ==="
+            "$binary"
+          done
+
+      - name: Verify the library was produced
+        # Fail here with the actual directory contents rather than at the upload step with a
+        # path that did not match. The findings also go to the job summary, because the
+        # Actions log for a failed job needs a token to read and the summary does not.
+        shell: bash
+        run: |
+          set -uo pipefail
+          {
+            echo "### ${{ matrix.name }}"
+            echo ""
+            echo '```'
+            echo "expected: native/build/${{ matrix.library }}"
+            echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+            echo "--- java on PATH ---"
+            command -v java && java -version 2>&1 | head -n 3
+            echo "--- jni.h candidates ---"
+            for dir in "${JAVA_HOME:-/nonexistent}/include" "${JAVA_HOME:-/nonexistent}/include/darwin" \
+                       "${JAVA_HOME:-/nonexistent}/include/linux" /usr/lib/jvm/*/include \
+                       /usr/local/opt/openjdk/include; do
+              [ -f "$dir/jni.h" ] && echo "FOUND $dir"
+            done
+            echo "--- build root ---"
+            ls -la native/build 2>&1 | head -n 40
+            echo "--- anything named wrobj ---"
+            find native/build -name '*wrobj*' 2>/dev/null | head -n 20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ! -f "native/build/${{ matrix.library }}" ]; then
+            echo "expected native/build/${{ matrix.library }} was not produced" >&2
+            exit 1
+          fi
+          echo "found native/build/${{ matrix.library }}"
+
+      - name: Upload the library
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: native/build/${{ matrix.library }}
+          if-no-files-found: error
+          retention-days: 30
+
+  build-android:
+    name: android-arm64
+    # Android is a best-effort target: the desktop platforms and the packaged jar must not
+    # depend on a cross build that needs an NDK and a translation layer to be exercised. The
+    # library is still built, staged and shipped when it succeeds.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Configure for Android
+        # Android is a cross build: the library is compiled by the NDK for the device and
+        # loaded by the launcher's JVM, which already has a GL binding. No GL symbols are
+        # linked here - see native/include/wrobj/wrgl_emit.hpp for why the draw path routes
+        # GL through the host instead.
+        #
+        # ANDROID_STL=c++_static is the NDK's own mechanism for putting the C++ runtime inside
+        # the library. Android ships no libstdc++ shared object, so without this the loader
+        # rejects the library with an unresolved symbol. The STL is selected here rather than
+        # by adding -static-libstdc++ in CMakeLists because the NDK toolchain already decides
+        # how to link the runtime, and passing the flag as well can conflict with that choice.
+        #
+        # ANDROID_NDK_LATEST_HOME is provided by the runner image; the fallback covers older
+        # images that only set ANDROID_NDK_HOME.
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          if [ -z "$NDK" ]; then
+            echo "No Android NDK found on this runner" >&2
+            exit 1
+          fi
+          echo "Using NDK at $NDK"
+          echo "--- jni.h in the NDK ---"
+          find "$NDK" -name jni.h -print 2>/dev/null | head -n 5 || true
+          cmake -S native -B native/build-android \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-26 \
+            -DANDROID_STL=c++_static \
+            -DWROBJ_BUILD_TESTS=OFF 2>&1 | tee native-android-configure.log
+          grep -E "wrobj:" native-android-configure.log || true
+
+      - name: Build
+        run: cmake --build native/build-android --config Release --parallel
+
+      - name: Check what was produced
+        shell: bash
+        run: find native/build-android -name 'wrobj.so' -print
+
+      - name: Upload the library
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrobj-android-arm64
+          path: native/build-android/**/wrobj.so
+          if-no-files-found: error
+          retention-days: 30
+
+  process-natives:
+    name: Assemble the native resources
+    # Not gated on the Android job, which is continue-on-error: a missing Android library
+    # means the Android loader falls back to the Java pipeline on that platform, not that
+    # the release is broken.
+    needs: [ build-and-test ]
+    if: always() && needs.build-and-test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download every platform
+        uses: actions/download-artifact@v4
+        with:
+          path: natives
+
+      - name: Lay them out for the jar
+        # fabric/build.gradle stages native/packaged/ into the jar under native/<platform>/,
+        # and NativeObjPipeline looks the library up under exactly that path. A platform
+        # that is missing simply falls back to the Java pipeline on that platform.
+        run: |
+          set -euo pipefail
+          for platform in windows-x64 linux-x64 macos-arm64 ios-arm64 ipados-arm64 android-arm64; do
+            mkdir -p "native/packaged/${platform}"
+          done
+          cp natives/wrobj-windows-x64/wrobj.dll             "native/packaged/windows-x64/"  2>/dev/null || true
+          cp natives/wrobj-linux-x64/wrobj.so             "native/packaged/linux-x64/"    2>/dev/null || true
+          cp natives/wrobj-macos-arm64/wrobj.dylib        "native/packaged/macos-arm64/"  2>/dev/null || true
+          # iOS and iPadOS ship the same iphoneos binary under both names, so a device the mod
+          # labels either way finds it. Apple compiles iPad apps against the iOS platform, so
+          # there is one build and two directories, not two binaries.
+          cp natives/wrobj-ios-arm64/wrobj.dylib          "native/packaged/ios-arm64/"    2>/dev/null || true
+          cp natives/wrobj-ios-arm64/wrobj.dylib          "native/packaged/ipados-arm64/" 2>/dev/null || true
+          cp natives/wrobj-android-arm64/wrobj.so         "native/packaged/android-arm64/" 2>/dev/null || true
+          echo "--- staged ---"
+          find native/packaged -type f -print -exec ls -l {} \;
+
+      - name: Upload the assembled resources
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrobj-natives
+          path: native/packaged
+          if-no-files-found: error
+          retention-days: 30
+
+  build-mod:
+    name: Build the mod (Fabric 1.20.1)
+    needs: [ process-natives ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # Full history: BuildTools names the release jar
+        # YYMTR-<loader>.<version>+<mc>_<date>.<commits>.jar with the count from
+        # `git rev-list --count HEAD`, which is 1 on a depth-1 checkout and would give
+        # every CI build the same non-monotonic count.
+        uses: actions/checkout@v4
+        with:
+          path: Minecraft-Transit-Railway
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download the assembled natives
+        uses: actions/download-artifact@v4
+        with:
+          name: wrobj-natives
+          path: Minecraft-Transit-Railway/native/packaged
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+        working-directory: ./Minecraft-Transit-Railway
+
+      - name: Build and test (1.20.1)
+        # This is the gate that matters: it compiles the mod against the mapping library,
+        # runs the JUnit suite - including the native equivalence tests and the vertex
+        # layout check - and packages the jar with the natives staged above.
+        #
+        # The output is teed through grep-saver because GitHub's log viewer truncates long
+        # javac output, and a truncated error list is worse than useless when the failure is
+        # the thing being diagnosed.
+        shell: bash
+        working-directory: ./Minecraft-Transit-Railway
+        run: |
+          set -o pipefail
+          ./gradlew :fabric:setupFiles :fabric:test :fabric:build \
+            -PmodLoader=fabric \
+            -PminecraftVersion=1.20.1 \
+            --console=plain 2>&1 | tee gradle-build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "::group::Compilation and test errors"
+            grep -nE 'error:|error;|Execution failed|What went wrong|FAILED|Caused by' gradle-build.log || true
+            echo "::endgroup::"
+            echo "::group::Last 120 lines of the build log"
+            tail -n 120 gradle-build.log
+            echo "::endgroup::"
+            exit "$status"
+          fi
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: Minecraft-Transit-Railway/gradle-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify the natives made it into the jar
+        shell: bash
+        working-directory: ./Minecraft-Transit-Railway
+        run: |
+          set -euo pipefail
+          jar_file=$(find build/release -name '*.jar' ! -name '*sources*' | head -n 1)
+          echo "checking $jar_file"
+          unzip -l "$jar_file" | grep -E 'native/.*wrobj\.(dll|so|dylib)' || {
+            echo "the native libraries are not in the jar" >&2
+            exit 1
+          }
+
+      - name: Upload the mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: YYMTR-fabric-1.20.1
+          path: Minecraft-Transit-Railway/build/release/*.jar
+          if-no-files-found: error
+          retention-days: 14
