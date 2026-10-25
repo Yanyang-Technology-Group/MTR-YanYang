@@ -140,17 +140,41 @@ public final class PersistentVehicleData {
 		getVehicleSoundBase(vehicleResource, carNumber).playMotorSound(bogiePosition, speed, speedChange, acceleration, isOnRoute);
 	}
 
+	public void playMotorSound(VehicleResource vehicleResource, int carNumber, BlockPos bogiePosition, float speed, float speedChange, float acceleration, boolean isOnRoute, double yaw, int runSoundIndex, long gameMillis) {
+		getVehicleSoundBase(vehicleResource, carNumber).playMotorSound(bogiePosition, speed, speedChange, acceleration, isOnRoute, yaw, runSoundIndex, gameMillis);
+	}
+
+	public void updateMotionSounds(int carNumber, BlockPos position, float speed, double yaw, int runSoundIndex, long gameMillis) {
+		// Occluded cars keep existing motion sounds current without loading new resources.
+		if (carNumber < vehicleSoundBaseList.size()) {
+			final VehicleSoundBase sounds = vehicleSoundBaseList.get(carNumber);
+			if (sounds != null) {
+				sounds.updateMotionSounds(position, speed, yaw, runSoundIndex, gameMillis);
+			}
+		}
+	}
+
 	public void playDoorSound(VehicleResource vehicleResource, int carNumber, BlockPos vehiclePosition) {
 		getVehicleSoundBase(vehicleResource, carNumber).playDoorSound(vehiclePosition, doorValue, oldDoorValue);
 	}
 
 	private VehicleSoundBase getVehicleSoundBase(VehicleResource vehicleResource, int carNumber) {
-		return getElement(vehicleSoundBaseList, carNumber, vehicleResource.createVehicleSoundBase);
+		while (vehicleSoundBaseList.size() <= carNumber) {
+			vehicleSoundBaseList.add(null);
+		}
+		VehicleSoundBase sounds = vehicleSoundBaseList.get(carNumber);
+		if (sounds == null) {
+			sounds = vehicleResource.createVehicleSoundBase.get();
+			vehicleSoundBaseList.set(carNumber, sounds);
+		}
+		return sounds;
 	}
 
 	public void dispose() {
 		for (VehicleSoundBase sounds : vehicleSoundBaseList) {
-			sounds.dispose();
+			if (sounds != null) {
+				sounds.dispose();
+			}
 		}
 	}
 

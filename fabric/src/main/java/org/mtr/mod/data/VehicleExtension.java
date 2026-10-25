@@ -28,6 +28,7 @@ import org.mtr.mod.generated.lang.TranslationProvider;
 import org.mtr.mod.packet.PacketCheckRouteIdHasDisabledAnnouncements;
 import org.mtr.mod.packet.PacketTurnOnBlockEntity;
 import org.mtr.mod.render.DrivingGuiRenderer;
+import org.mtr.mod.render.MainRenderer;
 import org.mtr.mod.resource.VehicleResource;
 
 import javax.annotation.Nullable;
@@ -35,6 +36,7 @@ import javax.annotation.Nullable;
 public class VehicleExtension extends Vehicle implements Utilities {
 
 	private double oldSpeed;
+	private final VehicleTrackSoundIndex trackSoundIndex;
 	private int speedLimitKilometersPerHour;
 	@Nullable
 	private DoubleObjectImmutablePair<DoubleDoubleImmutablePair> platformStoppingDetails;
@@ -43,6 +45,7 @@ public class VehicleExtension extends Vehicle implements Utilities {
 
 	public VehicleExtension(VehicleUpdate vehicleUpdate, Data data) {
 		super(vehicleUpdate.getVehicleExtraData(), null, new JsonReader(Utilities.getJsonObjectFromData(vehicleUpdate.getVehicle())), data);
+		trackSoundIndex = new VehicleTrackSoundIndex(vehicleExtraData.immutableVehicleCars.size());
 		final PersistentVehicleData tempPersistentVehicleData = MinecraftClientData.getInstance().vehicleIdToPersistentVehicleData.get(getId());
 		if (tempPersistentVehicleData == null) {
 			persistentVehicleData = new PersistentVehicleData(vehicleExtraData.immutableVehicleCars, getTransportMode());
@@ -298,12 +301,21 @@ public class VehicleExtension extends Vehicle implements Utilities {
 		final double oldRailProgress = railProgress;
 		railProgress = persistentVehicleData.getSmoothedRailProgress(railProgress, persistentVehicleData.getDoorValue() > 0 ? 0 : millisElapsed * (speed == 0 ? Integer.MAX_VALUE : speed / 10));
 		final ObjectArrayList<ObjectObjectImmutablePair<VehicleCar, ObjectArrayList<ObjectObjectImmutablePair<Vector, Vector>>>> vehicleCarsAndPositions = getVehicleCarsAndPositions();
+		trackSoundIndex.update(vehicleExtraData.immutableVehicleCars, vehicleExtraData.immutablePath, railProgress, vehicleExtraData.getTotalVehicleLength(), reversed);
 		railProgress = oldRailProgress;
 		return vehicleCarsAndPositions;
 	}
 
 	public void playMotorSound(VehicleResource vehicleResource, int carNumber, Vector bogiePosition) {
 		persistentVehicleData.playMotorSound(vehicleResource, carNumber, Init.newBlockPos(bogiePosition.x, bogiePosition.y, bogiePosition.z), (float) speed, (float) (speed - oldSpeed), (float) vehicleExtraData.getAcceleration(), getIsOnRoute());
+	}
+
+	public void playMotorSound(VehicleResource vehicleResource, int carNumber, Vector bogiePosition, double yaw) {
+		persistentVehicleData.playMotorSound(vehicleResource, carNumber, Init.newBlockPos(bogiePosition.x, bogiePosition.y, bogiePosition.z), (float) speed, (float) (speed - oldSpeed), (float) vehicleExtraData.getAcceleration(), getIsOnRoute(), yaw, trackSoundIndex.get(carNumber), MainRenderer.getTimerMillis());
+	}
+
+	public void updateMotionSounds(int carNumber, Vector position, double yaw) {
+		persistentVehicleData.updateMotionSounds(carNumber, Init.newBlockPos(position.x, position.y, position.z), (float) speed, yaw, trackSoundIndex.get(carNumber), MainRenderer.getTimerMillis());
 	}
 
 	public void playDoorSound(VehicleResource vehicleResource, int carNumber, Vector vehiclePosition) {

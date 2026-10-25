@@ -69,6 +69,10 @@ public final class RailResource extends RailResourceSchema implements StoredMode
 		return modelYOffset;
 	}
 
+	public int getRunSoundIndex() {
+		return (int) Math.max(0, Math.min(Integer.MAX_VALUE, runSoundIndex));
+	}
+
 	public static String getIdWithoutDirection(String id) {
 		return id.endsWith("_1") || id.endsWith("_2") ? id.substring(0, id.length() - 2) : id;
 	}

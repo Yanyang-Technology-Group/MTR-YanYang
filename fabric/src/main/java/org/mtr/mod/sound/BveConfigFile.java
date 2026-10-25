@@ -1,6 +1,7 @@
 package org.mtr.mod.sound;
 
 import org.apache.commons.lang3.StringUtils;
+import org.mtr.libraries.it.unimi.dsi.fastutil.ints.Int2ObjectAVLTreeMap;
 import org.mtr.mapping.holder.Identifier;
 import org.mtr.mapping.holder.SoundEvent;
 import org.mtr.mapping.mapper.SoundHelper;
@@ -11,6 +12,8 @@ public class BveConfigFile {
 
 	public final SoundEvent[] run = new SoundEvent[1];
 	public final SoundEvent[] flange = new SoundEvent[1];
+	public final Int2ObjectAVLTreeMap<SoundEvent> runSounds = new Int2ObjectAVLTreeMap<>();
+	public final Int2ObjectAVLTreeMap<SoundEvent> flangeSounds = new Int2ObjectAVLTreeMap<>();
 	public final SoundEvent[] motor = new SoundEvent[40];
 	public final SoundEvent[] joint = new SoundEvent[1];
 
@@ -121,16 +124,22 @@ public class BveConfigFile {
 						break;
 					case "run":
 					case "rolling":
-						if (Integer.parseInt(key) >= run.length) {
-							break;
+						final int runIndex = Integer.parseInt(key);
+						if (runIndex >= 0) {
+							runSounds.put(runIndex, valueAsSoundEvent);
+							if (runIndex == 0) {
+								run[0] = valueAsSoundEvent;
+							}
 						}
-						run[Integer.parseInt(key)] = valueAsSoundEvent;
 						break;
 					case "flange":
-						if (Integer.parseInt(key) >= flange.length) {
-							break;
+						final int flangeIndex = Integer.parseInt(key);
+						if (flangeIndex >= 0) {
+							flangeSounds.put(flangeIndex, valueAsSoundEvent);
+							if (flangeIndex == 0) {
+								flange[0] = valueAsSoundEvent;
+							}
 						}
-						flange[Integer.parseInt(key)] = valueAsSoundEvent;
 						break;
 					case "motor":
 						if (Integer.parseInt(key) >= motor.length) {
