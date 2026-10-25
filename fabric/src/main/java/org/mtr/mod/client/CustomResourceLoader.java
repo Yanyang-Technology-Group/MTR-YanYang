@@ -1,6 +1,7 @@
 package org.mtr.mod.client;
 
 import org.apache.commons.io.IOUtils;
+import org.mtr.core.data.Rail;
 import org.mtr.core.data.TransportMode;
 import org.mtr.core.tool.Utilities;
 import org.mtr.legacy.resource.CustomResourcesConverter;
@@ -282,6 +283,19 @@ public class CustomResourceLoader {
 		if (railResource != null) {
 			ifPresent.accept(railResource);
 		}
+	}
+
+	public static int getRailRunSoundIndex(Rail rail) {
+		// The default rail can be a base layer beneath a custom rail style.
+		// Use the first known custom style in the rail's stored order.
+		for (final String style : rail.getStyles()) {
+			final String railId = RailResource.getIdWithoutDirection(style);
+			final RailResource railResource = RAILS_CACHE.get(railId);
+			if (railResource != null && !DEFAULT_RAIL_ID.equals(railId)) {
+				return railResource.getRunSoundIndex();
+			}
+		}
+		return 0;
 	}
 
 	public static ObjectImmutableList<ObjectResource> getObjects() {
