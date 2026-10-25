@@ -55,17 +55,6 @@ mtr_custom_resources.json
 **/lang/*.json
 !en_us.json
 
-# native OBJ pipeline
-#
-# Build trees are per-platform and large, and the staged resources are CI output that
-# fabric/build.gradle copies into the jar. Committed sources are native/include,
-# native/src, native/jni, native/tests and native/tools.
-native/build/
-native/build-*/
-native/packaged/
-native/tools/*.class
-native/**/*.obj.bak
-
 # Node dependencies and the Angular build output
 #
 # `:fabric:setupFiles` runs npm install and an Angular build for the resource pack
@@ -80,4 +69,3 @@ native/**/*.obj.bak
 node_modules/
 website/dist/
 website/.angular/
-native/release/

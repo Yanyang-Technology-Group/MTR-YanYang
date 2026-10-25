@@ -6,6 +6,13 @@ public abstract class VehicleSoundBase {
 
 	public abstract void playMotorSound(BlockPos blockPos, float speed, float speedChange, float acceleration, boolean isOnRoute);
 
+	public void playMotorSound(BlockPos blockPos, float speed, float speedChange, float acceleration, boolean isOnRoute, double yaw, int runSoundIndex, long gameMillis) {
+		playMotorSound(blockPos, speed, speedChange, acceleration, isOnRoute);
+	}
+
+	public void updateMotionSounds(BlockPos blockPos, float speed, double yaw, int runSoundIndex, long gameMillis) {
+	}
+
 	public final void playDoorSound(BlockPos blockPos, double doorValue, double oldDoorValue) {
 		if (doorValue > 0 && oldDoorValue == 0) {
 			playDoorSound(blockPos, true);

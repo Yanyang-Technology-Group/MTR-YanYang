@@ -1,18 +1,26 @@
 package org.mtr.mod.sound;
 
+import org.mtr.libraries.it.unimi.dsi.fastutil.ints.Int2ObjectAVLTreeMap;
+import org.mtr.libraries.it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import org.mtr.mapping.holder.BlockPos;
 import org.mtr.mapping.holder.MinecraftClient;
 import org.mtr.mapping.holder.SoundEvent;
 
 import javax.annotation.Nullable;
 import java.util.Random;
+import java.util.function.DoubleSupplier;
+import java.util.function.Function;
 
 public class BveVehicleSound extends VehicleSoundBase {
 
 	private final BveVehicleSoundConfig config;
+	private final DoubleSupplier secondsElapsedSupplier;
 
 	private float oldSpeedChange;
 	private boolean oldOnRoute = false;
+	private double oldYaw;
+	private long oldMotionMillis = -1;
+	private double yawRate;
 
 	private float motorCurrentOutput = 0;
 	private float motorBreakerTimer = -1;
@@ -24,7 +32,12 @@ public class BveVehicleSound extends VehicleSoundBase {
 	private final VehicleLoopingSoundHolder vehicleLoopingSoundHolder;
 
 	public BveVehicleSound(BveVehicleSoundConfig config) {
+		this(config, VehicleLoopingSoundInstance::new, () -> MinecraftClient.getInstance().getLastFrameDuration() / 20);
+	}
+
+	BveVehicleSound(BveVehicleSoundConfig config, Function<SoundEvent, VehicleLoopingSoundInstance> soundFactory, DoubleSupplier secondsElapsedSupplier) {
 		this.config = config;
+		this.secondsElapsedSupplier = secondsElapsedSupplier;
 
 		mrPress = randomInt(config.config.mrPressMin, config.config.mrPressMax + 1);
 		isCompressorActive = randomInt(0, 20) == 0; // Currently set to 1/20 at client-side load
@@ -33,29 +46,31 @@ public class BveVehicleSound extends VehicleSoundBase {
 		final VehicleLoopingSoundInstance[] soundLoopMotor = new VehicleLoopingSoundInstance[config.config.motor.length];
 		for (int i = 0; i < Math.min(config.config.motor.length, config.motorData.getSoundCount()); i++) {
 			if (config.config.motor[i] != null) {
-				soundLoopMotor[i] = new VehicleLoopingSoundInstance(config.config.motor[i]);
+				soundLoopMotor[i] = soundFactory.apply(config.config.motor[i]);
 			}
 		}
 		vehicleLoopingSoundHolder = new VehicleLoopingSoundHolder(
 				soundLoopMotor,
-				config.config.run[0] == null ? null : new VehicleLoopingSoundInstance(config.config.run[0]),
-				config.config.flange[0] == null ? null : new VehicleLoopingSoundInstance(config.config.flange[0]),
-				config.config.noise == null ? null : new VehicleLoopingSoundInstance(config.config.noise),
-				config.config.shoe == null ? null : new VehicleLoopingSoundInstance(config.config.shoe),
-				config.config.compressorLoop == null ? null : new VehicleLoopingSoundInstance(config.config.compressorLoop)
+				createIndexedSounds(config.config.runSounds, soundFactory),
+				createIndexedSounds(config.config.flangeSounds, soundFactory),
+				config.config.noise == null ? null : soundFactory.apply(config.config.noise),
+				config.config.shoe == null ? null : soundFactory.apply(config.config.shoe),
+				config.config.compressorLoop == null ? null : soundFactory.apply(config.config.compressorLoop)
 		);
 	}
 
 	@Override
 	public void playMotorSound(BlockPos blockPos, float speed, float speedChange, float acceleration, boolean isOnRoute) {
-		final float secondsElapsed = MinecraftClient.getInstance().getLastFrameDuration() / 20;
+		playMotorSound(blockPos, speed, speedChange, acceleration, isOnRoute, Double.NaN, 0, 0);
+	}
+
+	@Override
+	public void playMotorSound(BlockPos blockPos, float speed, float speedChange, float acceleration, boolean isOnRoute, double yaw, int runSoundIndex, long gameMillis) {
+		final float secondsElapsed = (float) secondsElapsedSupplier.getAsDouble();
 		final float speedKilometersPerHour = speed * 3600;
 		final float speedMetersPerSecond = speed * 1000;
 
-		// Rolling noise
-		if (vehicleLoopingSoundHolder.soundLoopRun != null) {
-			vehicleLoopingSoundHolder.soundLoopRun.setData(Math.min(1, speedMetersPerSecond * 0.04F), speedMetersPerSecond * 0.04F, blockPos);
-		}
+		updateMotionSounds(blockPos, speed, yaw, runSoundIndex, gameMillis);
 
 		// Simulation of circuit breaker in traction controller
 		float motorTarget = Math.signum(speedChange);
@@ -115,12 +130,6 @@ public class BveVehicleSound extends VehicleSoundBase {
 			}
 		}
 
-		// TODO play flange sounds
-		// Flange noise
-		if (vehicleLoopingSoundHolder.soundLoopFlange != null) {
-			vehicleLoopingSoundHolder.soundLoopFlange.setData(0, 1, blockPos);
-		}
-
 		// Brake shoe rubbing noise (below regeneration brake cutoff limit)
 		if (vehicleLoopingSoundHolder.soundLoopShoe != null) {
 			final float shoePitch = 1 / (speedMetersPerSecond + 1) + 1;
@@ -164,6 +173,13 @@ public class BveVehicleSound extends VehicleSoundBase {
 	}
 
 	@Override
+	public void updateMotionSounds(BlockPos blockPos, float speed, double yaw, int runSoundIndex, long gameMillis) {
+		final float speedMetersPerSecond = Math.abs(speed) * 1000;
+		updateIndexedSound(vehicleLoopingSoundHolder.soundLoopRun, runSoundIndex, Math.min(1, speedMetersPerSecond * 0.04F), speedMetersPerSecond * 0.04F, blockPos);
+		updateIndexedSound(vehicleLoopingSoundHolder.soundLoopFlange, runSoundIndex, getFlangeGain(yaw, gameMillis, speedMetersPerSecond), 0.5F + speedMetersPerSecond * 0.04F, blockPos);
+	}
+
+	@Override
 	protected void playDoorSound(BlockPos blockPos, boolean isOpen) {
 		ScheduledSound.schedule(blockPos, isOpen ? config.config.doorOpen : config.config.doorClose, 2, 1);
 	}
@@ -186,13 +202,50 @@ public class BveVehicleSound extends VehicleSoundBase {
 		return new Random().nextInt(maxExclusive - minInclusive) + minInclusive;
 	}
 
+	private float getFlangeGain(double yaw, long gameMillis, float speedMetersPerSecond) {
+		if (!Double.isFinite(yaw)) {
+			oldMotionMillis = -1;
+			yawRate = 0;
+			return 0;
+		}
+		if (gameMillis != oldMotionMillis) {
+			final long millisElapsed = gameMillis - oldMotionMillis;
+			// Reseed after a visibility gap; the unseen rotation is not this frame's turn.
+			if (oldMotionMillis >= 0 && millisElapsed > 0 && millisElapsed <= 1000) {
+				final double deltaYaw = Math.atan2(Math.sin(yaw - oldYaw), Math.cos(yaw - oldYaw));
+				yawRate = Math.abs(deltaYaw) * 1000 / millisElapsed;
+			} else {
+				yawRate = 0;
+			}
+			oldYaw = yaw;
+			oldMotionMillis = gameMillis;
+		}
+		// Yaw rate (rad/s) times speed (m/s) gives lateral acceleration.
+		return (float) Math.min(0.75, yawRate * Math.abs(speedMetersPerSecond) * 0.5);
+	}
+
+	private static Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> createIndexedSounds(Int2ObjectAVLTreeMap<SoundEvent> sounds, Function<SoundEvent, VehicleLoopingSoundInstance> soundFactory) {
+		final Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> instances = new Int2ObjectAVLTreeMap<>();
+		for (final Int2ObjectMap.Entry<SoundEvent> entry : sounds.int2ObjectEntrySet()) {
+			instances.put(entry.getIntKey(), soundFactory.apply(entry.getValue()));
+		}
+		return instances;
+	}
+
+	private static void updateIndexedSound(Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> sounds, int index, float gain, float pitch, BlockPos blockPos) {
+		if (!sounds.isEmpty()) {
+			final int selectedIndex = sounds.containsKey(index) ? index : sounds.firstIntKey();
+			for (final Int2ObjectMap.Entry<VehicleLoopingSoundInstance> entry : sounds.int2ObjectEntrySet()) {
+				entry.getValue().setData(entry.getIntKey() == selectedIndex ? gain : 0, pitch, blockPos);
+			}
+		}
+	}
+
 	private static class VehicleLoopingSoundHolder {
 
 		private final VehicleLoopingSoundInstance[] soundLoopMotor;
-		@Nullable
-		private final VehicleLoopingSoundInstance soundLoopRun;
-		@Nullable
-		private final VehicleLoopingSoundInstance soundLoopFlange;
+		private final Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> soundLoopRun;
+		private final Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> soundLoopFlange;
 		@Nullable
 		private final VehicleLoopingSoundInstance soundLoopNoise;
 		@Nullable
@@ -202,8 +255,8 @@ public class BveVehicleSound extends VehicleSoundBase {
 
 		private VehicleLoopingSoundHolder(
 				VehicleLoopingSoundInstance[] soundLoopMotor,
-				@Nullable VehicleLoopingSoundInstance soundLoopRun,
-				@Nullable VehicleLoopingSoundInstance soundLoopFlange,
+				Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> soundLoopRun,
+				Int2ObjectAVLTreeMap<VehicleLoopingSoundInstance> soundLoopFlange,
 				@Nullable VehicleLoopingSoundInstance soundLoopNoise,
 				@Nullable VehicleLoopingSoundInstance soundLoopShoe,
 				@Nullable VehicleLoopingSoundInstance soundLoopCompressor
@@ -222,12 +275,8 @@ public class BveVehicleSound extends VehicleSoundBase {
 					instance.dispose();
 				}
 			}
-			if (soundLoopRun != null) {
-				soundLoopRun.dispose();
-			}
-			if (soundLoopFlange != null) {
-				soundLoopFlange.dispose();
-			}
+			soundLoopRun.values().forEach(VehicleLoopingSoundInstance::dispose);
+			soundLoopFlange.values().forEach(VehicleLoopingSoundInstance::dispose);
 			if (soundLoopNoise != null) {
 				soundLoopNoise.dispose();
 			}

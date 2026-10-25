@@ -149,6 +149,52 @@ if (project.hasProperty("serverOptimizationTest")) {
 	}
 }
 
+if (project.hasProperty("renderBatchTest")) {
+	sourceSets {
+		renderBatchTest {
+			compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+			runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+		}
+	}
+	loom {
+		mods {
+			mtr { sourceSet sourceSets.main }
+			mtrRenderBatchTest { sourceSet sourceSets.renderBatchTest }
+		}
+		runs {
+			renderBatchTest {
+				client()
+				source sourceSets.renderBatchTest
+				runDir "build/render-batch-test"
+			}
+		}
+	}
+	tasks.named("runRenderBatchTest", JavaExec) {
+		javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(buildTools.javaLanguageVersion) }
+		final File runDirectory = layout.buildDirectory.dir("render-batch-test").get().asFile
+		doFirst {
+			delete(new File(runDirectory, "render-batch-test.ok"))
+		}
+		doLast {
+			final File marker = new File(runDirectory, "render-batch-test.ok")
+			if (!marker.isFile() || marker.getText("UTF-8") != "MTR_RENDER_BATCH_INTEGRATION_OK") {
+				throw new GradleException("The Fabric client exited without completing the render batch integration assertions")
+			}
+		}
+	}
+	processRenderBatchTestResources {
+		rename "mtr-render-batch-test.mod.json", "fabric.mod.json"
+	}
+}
+
+tasks.register("runRenderBatchBenchmark", JavaExec) {
+	dependsOn testClasses
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = "org.mtr.mod.render.RenderBatchBenchmark"
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(buildTools.javaLanguageVersion) }
+	jvmArgs "-Xms512m", "-Xmx512m"
+}
+
 tasks.register("setupWebsiteFiles") {
 //	copy {
 //		outputs.upToDateWhen { false }

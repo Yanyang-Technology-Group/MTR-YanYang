@@ -41,11 +41,7 @@ public interface StoredModelResourceBase {
 			} else if (isSupportedModelResource) {
 				try {
 					final Object2ObjectOpenHashMap<PartCondition, ObjectArrayList<OptimizedModelWrapper.ObjModelWrapper>> objModels = new Object2ObjectOpenHashMap<>();
-					// Either backend can serve this call. The native one hands back C++ geometry that
-					// never became a Java vertex object; the Java one is the original path and is
-					// still used whenever the native library is missing or rejects the document.
-					final ModelResourceLoader.LoadedModels loadedModels = ModelResourceLoader.loadModelAnyBackend(modelResource, textureId, flipTextureV, resourceProvider);
-					final Object2ObjectAVLTreeMap<String, OptimizedObjModel> rawModels = loadedModels.toTypedMap();
+					final Object2ObjectAVLTreeMap<String, OptimizedModel.ObjModel> rawModels = ModelResourceLoader.loadModel(modelResource, textureId, flipTextureV, resourceProvider);
 					transform(rawModels.values());
 					final DynamicVehicleModel dynamicVehicleModel = new DynamicVehicleModel(
 							rawModels,
@@ -55,7 +51,7 @@ public interface StoredModelResourceBase {
 							""
 					);
 					dynamicVehicleModel.writeFloorsAndDoorways(new ObjectArrayList<>(), new ObjectArrayList<>(), new Object2ObjectOpenHashMap<>(), new Object2ObjectOpenHashMap<>(), new Object2ObjectOpenHashMap<>(), objModels);
-					models = new ObjectObjectImmutablePair<>(OptimizedModelWrapper.fromObjModelWrappers(objModels.get(PartCondition.NORMAL)), dynamicVehicleModel);
+					models = new ObjectObjectImmutablePair<>(OptimizedModelWrapper.fromObjModels(objModels.get(PartCondition.NORMAL)), dynamicVehicleModel);
 				} catch (Exception e) {
 					Init.LOGGER.error("[{}] Invalid model!", modelResource, e);
 					models = new ObjectObjectImmutablePair<>(null, null);
@@ -96,13 +92,6 @@ public interface StoredModelResourceBase {
 
 	void preload();
 
-	/**
-	 * Applies the resource's own translation, rotation, scale and mirror to every model.
-	 *
-	 * <p>Parameterised over {@link OptimizedObjModel} so the same code drives both backends. The
-	 * native implementation folds these into its source meshes and recomputes the bounding box
-	 * after each one, exactly as the Java implementation does.</p>
-	 */
-	default void transform(ObjectCollection<? extends OptimizedObjModel> values) {
+	default void transform(ObjectCollection<OptimizedModel.ObjModel> values) {
 	}
 }

@@ -104,7 +104,12 @@ public class RenderVehicles implements IGui {
 					return () -> vehicle.persistentVehicleData.rayTracing[carNumber] = shouldRender;
 				});
 
-				if (vehicle.persistentVehicleData.rayTracing[carNumber] || VehicleRidingMovement.isRiding(vehicle.getId())) {
+				final boolean shouldRenderCar = vehicle.persistentVehicleData.rayTracing[carNumber] || VehicleRidingMovement.isRiding(vehicle.getId());
+				if (!shouldRenderCar && !OptimizedRenderer.renderingShadows()) {
+					final PositionAndRotation positionAndRotation = vehicleCarDetails.right().right();
+					vehicle.updateMotionSounds(carNumber, positionAndRotation.position, positionAndRotation.yaw);
+				}
+				if (shouldRenderCar) {
 					CustomResourceLoader.getVehicleById(vehicle.getTransportMode(), vehicleCarDetails.left().getVehicleId(), vehicleResourceDetails -> {
 						final VehicleResource vehicleResource = vehicleResourceDetails.left();
 						final boolean fromResourcePackCreator = vehicleResourceDetails.rightBoolean() && !vehicle.getIsOnRoute();
@@ -205,7 +210,7 @@ public class RenderVehicles implements IGui {
 
 						// Play vehicle sounds
 						if (!OptimizedRenderer.renderingShadows()) {
-							vehicle.playMotorSound(vehicleResource, carNumber, absoluteVehicleCarPositionAndRotation.position);
+							vehicle.playMotorSound(vehicleResource, carNumber, absoluteVehicleCarPositionAndRotation.position, absoluteVehicleCarPositionAndRotation.yaw);
 
 							// Play door sounds
 							if (!openDoorways.isEmpty()) {

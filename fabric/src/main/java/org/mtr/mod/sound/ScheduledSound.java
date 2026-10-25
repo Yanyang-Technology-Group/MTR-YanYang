@@ -24,7 +24,7 @@ public final class ScheduledSound {
 	private void play() {
 		final ClientWorld clientWorld = MinecraftClient.getInstance().getWorldMapped();
 		if (clientWorld != null) {
-			SCHEDULED_SOUNDS.values().forEach(scheduledSound -> clientWorld.playSoundAtBlockCenter(blockPos, soundEvent, SoundCategory.getBlocksMapped(), gain, pitch, false));
+			clientWorld.playSoundAtBlockCenter(blockPos, soundEvent, SoundCategory.getBlocksMapped(), gain, pitch, false);
 		}
 	}
 

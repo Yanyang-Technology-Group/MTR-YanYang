@@ -19,6 +19,7 @@ import org.mtr.mod.screen.DashboardListItem;
 
 import javax.annotation.Nullable;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,7 +29,7 @@ public final class MinecraftClientData extends ClientData {
 	public final ObjectArraySet<VehicleExtension> vehicles = new ObjectArraySet<>();
 	public final Long2ObjectAVLTreeMap<PersistentVehicleData> vehicleIdToPersistentVehicleData = new Long2ObjectAVLTreeMap<>();
 	public final Long2ObjectAVLTreeMap<LiftWrapper> liftWrapperList = new Long2ObjectAVLTreeMap<>();
-	public final Object2ObjectOpenHashMap<String, RailWrapper> railWrapperList = new Object2ObjectOpenHashMap<>();
+	public final Object2ObjectArrayMap<String, RailWrapper> railWrapperList = new HashBackedArrayMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToPreBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final Object2ObjectAVLTreeMap<String, LongArrayList> railIdToCurrentlyBlockedSignalColors = new Object2ObjectAVLTreeMap<>();
 	public final ObjectArraySet<String> blockedRailIds = new ObjectArraySet<>();
@@ -238,17 +239,23 @@ public final class MinecraftClientData extends ClientData {
 		}
 
 		public ModelLift1 getModel() {
-			final int height = (int) Math.round(lift.getHeight() * 2);
-			final int width = (int) Math.round(lift.getWidth());
-			final int depth = (int) Math.round(lift.getDepth());
-			final boolean doubleSided = lift.getIsDoubleSided();
-			if (model == null || height != modelHeight || width != modelWidth || depth != modelDepth || doubleSided != modelDoubleSided) {
-				model = new ModelLift1(height, width, depth, doubleSided);
-				modelHeight = height;
-				modelWidth = width;
-				modelDepth = depth;
-				modelDoubleSided = doubleSided;
+			if (getCachedModel() == null) {
+				cacheModel(new ModelLift1((int) Math.round(lift.getHeight() * 2), (int) Math.round(lift.getWidth()), (int) Math.round(lift.getDepth()), lift.getIsDoubleSided()));
 			}
+			return model;
+		}
+
+		@Nullable
+		public ModelLift1 getCachedModel() {
+			return model != null && modelHeight == (int) Math.round(lift.getHeight() * 2) && modelWidth == (int) Math.round(lift.getWidth()) && modelDepth == (int) Math.round(lift.getDepth()) && modelDoubleSided == lift.getIsDoubleSided() ? model : null;
+		}
+
+		public ModelLift1 cacheModel(ModelLift1 model) {
+			this.model = Objects.requireNonNull(model);
+			modelHeight = (int) Math.round(lift.getHeight() * 2);
+			modelWidth = (int) Math.round(lift.getWidth());
+			modelDepth = (int) Math.round(lift.getDepth());
+			modelDoubleSided = lift.getIsDoubleSided();
 			return model;
 		}
 	}

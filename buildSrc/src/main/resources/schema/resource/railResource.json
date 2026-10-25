@@ -32,6 +32,12 @@
 		},
 		"modelYOffset": {
 			"type": "number"
+		},
+		"runSoundIndex": {
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 2147483647,
+			"default": 0
 		}
 	},
 	"required": [
