@@ -124,9 +124,7 @@ public final class VehicleModel extends VehicleModelSchema {
 						id
 				);
 			} else if (ModelResourceLoader.isSupportedModelResource(modelResource)) {
-				// The backend is chosen inside loadModelAnyBackend, so this call site does not
-				// care whether the geometry comes from C++ or from javagl.
-				return new DynamicVehicleModel(ModelResourceLoader.loadModelAnyBackend(modelResource, textureId, flipTextureV, resourceProvider).toTypedMap(), textureId, modelProperties, positionDefinitions, id);
+				return new DynamicVehicleModel(ModelResourceLoader.loadModel(modelResource, textureId, flipTextureV, resourceProvider), textureId, modelProperties, positionDefinitions, id);
 			} else {
 				Init.LOGGER.error("[{}] Invalid model!", modelResource);
 				return new DynamicVehicleModel(

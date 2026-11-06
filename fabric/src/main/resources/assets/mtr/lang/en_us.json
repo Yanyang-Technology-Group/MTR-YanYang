@@ -338,6 +338,8 @@
 	"gui.mtr.rail_shape": "Rail shape:",
 	"gui.mtr.rail_shape_quadratic": "Quadratic",
 	"gui.mtr.rail_shape_two_radii": "Two Radii",
+	"gui.mtr.rail_shape_cubic_parabola": "Cubic Parabola",
+	"gui.mtr.rail_shape_half_wave_sine": "Half-Wave Sine",
 	"gui.mtr.rail_styles": "Rail styles:",
 	"gui.mtr.rail_xyz_offset": "XYZ Offset",
 	"gui.mtr.rail_xz_length": "Horizontal Length",
