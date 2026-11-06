@@ -24,7 +24,7 @@ public class RailModifierScreen extends MTRScreenBase implements IGui {
         private final int buttonsWidth;
 
         private final Rail rail;
-        private final double maxRadius;
+        private double maxRadius;
         private final ButtonWidgetExtension buttonShape;
         private final ButtonWidgetExtension buttonStyle;
         private final ButtonWidgetExtension buttonStyleFlip;
@@ -57,6 +57,7 @@ public class RailModifierScreen extends MTRScreenBase implements IGui {
                                 case CUBIC_PARABOLA -> Rail.Shape.HALF_WAVE_SINE;
                                 default -> Rail.Shape.QUADRATIC;
                         };
+                        maxRadius = rail == null ? 0 : Rail.copy(rail, shape, radius).railMath.getMaxVerticalRadius();
                         update(radius, true);
                 });
                 buttonStyle = new ButtonWidgetExtension(0, 0, 0, SQUARE_SIZE, TextHelper.translatable("selectWorld.edit"), button -> {
